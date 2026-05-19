@@ -1,0 +1,84 @@
+const DANGEROUS_ZONES = [
+  { name: 'Kimyasal Depo', lat: 40.1920, lng: 29.0610, radius: 50 },
+  { name: 'Elektrik Odası', lat: 40.1925, lng: 29.0615, radius: 30 },
+];
+
+const THRESHOLDS = {
+  HARD_IMPACT_G: 2.5,
+  FALL_G: 3.0,
+  INACTIVITY_MINUTES: 5,
+  LOW_BATTERY: 15,
+};
+
+function getDistance(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 +
+            Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) *
+            Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function analyzeSensorData(sensorData, lastLogs) {
+  const alarms = [];
+  const { accelerometer, location, batteryLevel } = sensorData;
+
+  if (accelerometer?.magnitude > THRESHOLDS.HARD_IMPACT_G) {
+    const severity = accelerometer.magnitude > THRESHOLDS.FALL_G 
+      ? 'CRITICAL' : 'HIGH';
+    const type = accelerometer.magnitude > THRESHOLDS.FALL_G 
+      ? 'FALL_DETECTED' : 'HARD_IMPACT';
+    alarms.push({
+      type,
+      severity,
+      description: 'Ivme buyuklugu: ${accelerometer.magnitude.toFixed(2)}g',
+      sensorData: accelerometer
+    });
+  }
+
+  if (location?.latitude && location?.longitude) {
+    for (const zone of DANGEROUS_ZONES) {
+      const dist = getDistance(
+        location.latitude, location.longitude,
+        zone.lat, zone.lng
+      );
+      if (dist < zone.radius) {
+        alarms.push({
+          type: 'DANGEROUS_ZONE',
+          severity: 'HIGH',
+          description: '${zone.name} bolgesine girildi (${dist.toFixed(0)}m)',
+          sensorData: location
+        });
+      }
+    }
+  }
+
+  if (lastLogs && lastLogs.length >= 3) {
+    const allStill = lastLogs.every(log => 
+      log.accelerometer?.magnitude < 0.3
+    );
+    const timeSpan = (Date.now() - new Date(lastLogs[0].timestamp)) / 60000;
+    if (allStill && timeSpan > THRESHOLDS.INACTIVITY_MINUTES) {
+      alarms.push({
+        type: 'INACTIVITY',
+        severity: 'MEDIUM',
+        description: '${timeSpan.toFixed(1)} dakika hareketsizlik tespit edildi',
+        sensorData: { duration: timeSpan }
+      });
+    }
+  }
+
+  if (batteryLevel && batteryLevel < THRESHOLDS.LOW_BATTERY) {
+    alarms.push({
+      type: 'LOW_BATTERY',
+      severity: 'LOW',
+      description: 'Pil seviyesi: %${batteryLevel}',
+      sensorData: { batteryLevel }
+    });
+  }
+
+  return alarms;
+}
+
+module.exports = { analyzeSensorData };
