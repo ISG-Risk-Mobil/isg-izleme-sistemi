@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 
 const RENKLER = {
   navy: '#0F172A',
@@ -6,14 +7,47 @@ const RENKLER = {
   text: '#F8FAFC'
 };
 
-function Login({ baslangicKayitMi }) {
+// Backend'in çalıştığı port 5000 olarak tanımlandı
+const API_URL = 'http://localhost:5000/api';
+
+function LoginPage({ baslangicKayitMi, onLogin }) {
   const [isLogin, setIsLogin] = useState(!baslangicKayitMi);
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    alert(`${isLogin ? 'Giriş' : 'Kayıt'} işlemi yapılıyor: ${email}`);
+
+    try {
+      if (isLogin) {
+        // GİRİŞ İŞLEMİ
+        const response = await axios.post(`${API_URL}/auth/login`, {
+          email,
+          password
+        });
+        
+        // Token'ı güvenli bir şekilde sakla
+        localStorage.setItem('token', response.data.token);
+        alert('Giriş başarılı!');
+        if (onLogin) onLogin(); // Uygulamayı ana sayfaya yönlendirme fonksiyonu
+        
+      } else {
+        // KAYIT İŞLEMİ
+        await axios.post(`${API_URL}/auth/register`, {
+          name,
+          email,
+          password,
+          role: 'user', 
+          department: 'genel'
+        });
+        alert('Kayıt başarılı! Şimdi giriş yapabilirsiniz.');
+        setIsLogin(true); 
+      }
+    } catch (error) {
+      console.error(error);
+      alert(error.response?.data?.message || 'Bağlantı hatası: Sunucuya ulaşılamıyor!');
+    }
   };
 
   return (
@@ -28,7 +62,14 @@ function Login({ baslangicKayitMi }) {
         {!isLogin && (
           <div style={inputContainer}>
             <label style={labelStyle}>Ad Soyad</label>
-            <input type="text" placeholder="Melike Dal" style={inputStyle} required />
+            <input 
+              type="text" 
+              placeholder="Melike Dal" 
+              style={inputStyle} 
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required 
+            />
           </div>
         )}
 
@@ -68,7 +109,7 @@ function Login({ baslangicKayitMi }) {
   );
 }
 
-// Tasarım Objeleri (Stiller)
+// Tasarım Objeleri
 const glassCardStyle = { background: 'rgba(255, 255, 255, 0.05)', backdropFilter: 'blur(15px)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '24px', padding: '40px', width: '100%', maxWidth: '400px', textAlign: 'center', boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5)' };
 const logoWrapper = { marginBottom: '30px' };
 const iconStyle = { fontSize: '40px', marginBottom: '10px' };
@@ -81,4 +122,4 @@ const inputStyle = { width: '100%', padding: '12px', backgroundColor: 'rgba(255,
 const buttonStyle = { backgroundColor: RENKLER.accent, color: RENKLER.navy, padding: '14px', borderRadius: '10px', border: 'none', fontWeight: '700', cursor: 'pointer' };
 const toggleButton = { background: 'none', border: 'none', color: RENKLER.accent, marginTop: '20px', cursor: 'pointer', fontSize: '14px', textDecoration: 'underline' };
 
-export default Login;
+export default LoginPage;

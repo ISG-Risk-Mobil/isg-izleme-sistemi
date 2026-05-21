@@ -13,50 +13,64 @@ function App() {
   const [yazi, setYazi] = useState('');
   const tamMetin = "VISIONGUARD";
 
+  // DÜZELTME 1: Fonksiyonu return'den ÖNCEYE taşıdık
+  const authAc = (kayitModu) => {
+    setKayitMi(kayitModu);
+    setGosterimModu('AUTH');
+  };
+
   // Daktilo Animasyonu
-  // Sürekli devam eden daktilo efekti
   useEffect(() => {
     let i = 0;
     let siliniyorMu = false;
     
     const zamanlayici = setInterval(() => {
-      // Mevcut metni slice ile ayarla
       setYazi(tamMetin.slice(0, i));
 
       if (!siliniyorMu) {
-        // Yazma aşaması
         i++;
         if (i > tamMetin.length) {
-          // Yazma bitti, biraz bekle ve silmeye başla
           siliniyorMu = true;
-          // Buradaki bekleme süresini (2000ms = 2sn) isteğine göre değiştirebilirsin
         }
       } else {
-        // Silme aşaması
         i--;
         if (i < 0) {
-          // Silme bitti, tekrar yazmaya başla
           siliniyorMu = false;
           i = 0;
         }
       }
-    }, siliniyorMu ? 100 : 200); // Silerken daha hızlı (100ms), yazarken daha yavaş (200ms)
+    }, siliniyorMu ? 100 : 200);
 
     return () => clearInterval(zamanlayici);
   }, []);
 
+  // DÜZELTME 2: return her zaman fonksiyonun en sonunda olmalı
   return (
     <div style={anaKonteyner}>
       {/* Navigasyon Barı */}
-      <nav style={navBar}>
-        <div style={{ fontWeight: '800', letterSpacing: '2px', color: RENKLER.altin }}>VG-SYSTEMS</div>
-        <div style={{ display: 'flex', gap: '15px' }}>
-          <button onClick={() => authAc(false)} style={navButon}>Giriş Yap</button>
-          <button onClick={() => authAc(true)} style={{ ...navButon, backgroundColor: RENKLER.altin, color: RENKLER.lacivert }}>
-            Hesap Oluştur
-          </button>
-        </div>
-      </nav>
+      {/* Navigasyon Barı */}
+<nav style={navBar}>
+  <div style={{ fontWeight: '800', letterSpacing: '2px', color: RENKLER.altin }}>VG-SYSTEMS</div>
+  <div style={{ display: 'flex', gap: '15px' }}>
+    
+    {/* Giriş Yap Butonu - Güncellendi */}
+    <button 
+      onClick={() => authAc(false)} 
+      style={{ ...navButon, backgroundColor: RENKLER.altin, color: RENKLER.lacivert }}
+    >
+      Giriş Yap
+    </button>
+
+    {/* Hesap Oluştur Butonu */}
+    <button 
+      onClick={() => authAc(true)} 
+      style={{ ...navButon, backgroundColor: RENKLER.altin, color: RENKLER.lacivert }}
+    >
+      Hesap Oluştur
+    </button>
+    
+  </div>
+</nav>
 
       {/* İçerik Alanı */}
       <div style={icerikAlani}>
@@ -83,7 +97,7 @@ function App() {
   );
 }
 
-// Stiller
+// Stiller (Aynı kalıyor)
 const anaKonteyner = { backgroundColor: RENKLER.lacivert, height: '100vh', width: '100vw', overflow: 'hidden', position: 'relative', fontFamily: "'Inter', sans-serif" };
 const navBar = { position: 'absolute', top: 0, width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '30px 60px', boxSizing: 'border-box', zIndex: 100 };
 const navButon = { padding: '10px 25px', borderRadius: '10px', border: `1px solid ${RENKLER.altin}`, backgroundColor: 'transparent', color: RENKLER.altin, cursor: 'pointer', fontWeight: '700', transition: '0.3s' };
