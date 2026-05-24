@@ -72,4 +72,24 @@ router.get('/:deviceId', protect, async (req, res) => {
   }
 });
 
+router.post('/vision-violation', protect, async (req, res) => {
+  try {
+    const { deviceId, violationType, description } = req.body;
+
+    const alarm = await Alarm.create({
+      deviceId,
+      userId: req.user._id,
+      type: 'PPE_VIOLATION',
+      severity: 'HIGH',
+      description: 'Yapay Zeka Uyarisi: ' + description
+    });
+
+    req.app.get('io').emit('new-alarm', alarm);
+
+    res.status(201).json({ success: true, alarm });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 module.exports = router;

@@ -18,7 +18,8 @@ const alarmSchema = new mongoose.Schema({
       'INACTIVITY',
       'DANGEROUS_ZONE',
       'HIGH_RISK_SCORE',
-      'LOW_BATTERY'
+      'LOW_BATTERY',
+      'PPE_VIOLATION'
     ],
     required: true 
   },
