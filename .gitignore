@@ -141,3 +141,27 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# React Native / Android
+android/.gradle/
+android/build/
+android/app/build/
+android/app/.cxx/
+android/app/intermediates/
+android/app/generated/
+android/app/outputs/
+
+# Android local config
+android/local.properties
+local.properties
+
+# iOS
+ios/build/
+ios/Pods/
+
+# Metro / React Native cache
+.metro/
+.expo/
+
+# VS Code
+.vscode/

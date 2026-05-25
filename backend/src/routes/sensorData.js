@@ -12,7 +12,7 @@ router.post('/', protect, async (req, res) => {
 
     if (accelerometer) {
       accelerometer.magnitude = Math.sqrt(
-        accelerometer.x2 + accelerometer.y2 + accelerometer.z**2
+        accelerometer.x**2 + accelerometer.y**2 + accelerometer.z**2
       );
     }
 

@@ -12,73 +12,103 @@ const THRESHOLDS = {
 
 function getDistance(lat1, lng1, lat2, lng2) {
   const R = 6371000;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(dLat/2)**2 +
-            Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) *
-            Math.sin(dLng/2)**2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 function analyzeSensorData(sensorData, lastLogs) {
   const alarms = [];
+
   const { accelerometer, location, batteryLevel } = sensorData;
 
+  // 1. Sert darbe / düşme analizi
   if (accelerometer?.magnitude > THRESHOLDS.HARD_IMPACT_G) {
-    const severity = accelerometer.magnitude > THRESHOLDS.FALL_G 
-      ? 'CRITICAL' : 'HIGH';
-    const type = accelerometer.magnitude > THRESHOLDS.FALL_G 
-      ? 'FALL_DETECTED' : 'HARD_IMPACT';
+    const isFall =
+      accelerometer.magnitude > THRESHOLDS.FALL_G;
+
     alarms.push({
-      type,
-      severity,
-      description: 'Ivme buyuklugu: ${accelerometer.magnitude.toFixed(2)}g',
-      sensorData: accelerometer
+      type: isFall ? 'FALL_DETECTED' : 'HARD_IMPACT',
+      severity: isFall ? 'CRITICAL' : 'HIGH',
+      description: `İvme büyüklüğü: ${accelerometer.magnitude.toFixed(2)}g`,
+      sensorData: accelerometer,
     });
   }
 
+  // 2. Tehlikeli bölge analizi
   if (location?.latitude && location?.longitude) {
     for (const zone of DANGEROUS_ZONES) {
       const dist = getDistance(
-        location.latitude, location.longitude,
-        zone.lat, zone.lng
+        location.latitude,
+        location.longitude,
+        zone.lat,
+        zone.lng,
       );
+
       if (dist < zone.radius) {
         alarms.push({
           type: 'DANGEROUS_ZONE',
           severity: 'HIGH',
-          description: '${zone.name} bolgesine girildi (${dist.toFixed(0)}m)',
-          sensorData: location
+          description: `${zone.name} bölgesine girildi (${dist.toFixed(0)}m)`,
+          sensorData: location,
         });
       }
     }
   }
 
+  // 3. Hareketsizlik analizi
   if (lastLogs && lastLogs.length >= 3) {
-    const allStill = lastLogs.every(log => 
-      log.accelerometer?.magnitude < 0.3
+    const allStill = lastLogs.every(
+      (log) => log.accelerometer?.magnitude < 0.3,
     );
-    const timeSpan = (Date.now() - new Date(lastLogs[0].timestamp)) / 60000;
-    if (allStill && timeSpan > THRESHOLDS.INACTIVITY_MINUTES) {
+
+    const oldestLog = lastLogs[lastLogs.length - 1];
+
+    const timeSpan =
+      (Date.now() - new Date(oldestLog.timestamp).getTime()) /
+      60000;
+
+    if (
+      allStill &&
+      timeSpan > THRESHOLDS.INACTIVITY_MINUTES
+    ) {
       alarms.push({
         type: 'INACTIVITY',
         severity: 'MEDIUM',
-        description: '${timeSpan.toFixed(1)} dakika hareketsizlik tespit edildi',
-        sensorData: { duration: timeSpan }
+        description: `${timeSpan.toFixed(1)} dakika hareketsizlik tespit edildi`,
+        sensorData: {
+          duration: timeSpan,
+        },
       });
     }
   }
 
-  if (batteryLevel && batteryLevel < THRESHOLDS.LOW_BATTERY) {
+  // 4. Düşük pil analizi
+  if (
+    typeof batteryLevel === 'number' &&
+    batteryLevel < THRESHOLDS.LOW_BATTERY
+  ) {
     alarms.push({
       type: 'LOW_BATTERY',
       severity: 'LOW',
-      description: 'Pil seviyesi: %${batteryLevel}',
-      sensorData: { batteryLevel }
+      description: `Pil seviyesi: %${batteryLevel}`,
+      sensorData: {
+        batteryLevel,
+      },
     });
   }
 
   return alarms;
 }
 
-module.exports = { analyzeSensorData };
+module.exports = {
+  analyzeSensorData,
+};
