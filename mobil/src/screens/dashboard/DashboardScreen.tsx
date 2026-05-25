@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, {useEffect, useState} from 'react';
 
 import {
   View,
@@ -7,179 +7,253 @@ import {
   SafeAreaView,
   ScrollView,
   StatusBar,
+  ActivityIndicator,
+  RefreshControl,
+  Dimensions,
 } from 'react-native';
 
-const DashboardScreen = () => {
-  const [riskScore] = useState(24);
+import {LineChart} from 'react-native-chart-kit';
 
-  // DEMO ANALİZ VERİLERİ
-  const analytics = {
-    totalAlerts: 12,
-    safeStatus: 87,
+import {useAuth} from '../../context/AuthContext';
+import {getDashboardData} from '../../services/api/dashboardService';
+
+const DashboardScreen = () => {
+  const {token} = useAuth();
+
+  const screenWidth = Dimensions.get('window').width;
+
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const [alarms, setAlarms] = useState<any[]>([]);
+  const [riskScore, setRiskScore] = useState(0);
+
+  const [analytics, setAnalytics] = useState({
+    totalAlerts: 0,
+    safeStatus: 100,
     sensorAccuracy: 96,
-    activeDevices: 4,
+    activeDevices: 0,
+  });
+
+  useEffect(() => {
+    if (!token) return;
+
+    fetchDashboard();
+  }, [token]);
+
+  const fetchDashboard = async () => {
+    try {
+      if (!token) {
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+
+      const response = await getDashboardData(token);
+
+      if (response.success) {
+        const data = response.alarms || [];
+
+        setAlarms(data);
+
+        const critical = data.filter(
+          (item: any) => item.severity === 'CRITICAL',
+        ).length;
+
+        const high = data.filter(
+          (item: any) => item.severity === 'HIGH',
+        ).length;
+
+        const medium = data.filter(
+          (item: any) => item.severity === 'MEDIUM',
+        ).length;
+
+        const risk = Math.min(
+          critical * 25 + high * 15 + medium * 8,
+          100,
+        );
+
+        setRiskScore(risk);
+
+        setAnalytics({
+          totalAlerts: data.length,
+          safeStatus: Math.max(100 - risk, 0),
+          sensorAccuracy: 96,
+          activeDevices: new Set(
+            data
+              .map((item: any) => item.deviceId?._id || item.deviceId?.deviceId)
+              .filter(Boolean),
+          ).size,
+        });
+      }
+    } catch (error) {
+      console.log('Dashboard Error:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
-  const anomalyData = [
-    {
-      id: 1,
-      title: 'Ani Fren Tespiti',
-      risk: 'Orta Risk',
-      value: '2.8 g',
-    },
-    {
-      id: 2,
-      title: 'Uzun Süre Hareketsizlik',
-      risk: 'Düşük Risk',
-      value: '14 dk',
-    },
-    {
-      id: 3,
-      title: 'GPS Sapması',
-      risk: 'Yüksek Risk',
-      value: '42 m',
-    },
-  ];
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchDashboard();
+  };
+
+  const chartData = alarms
+    .slice(0, 7)
+    .reverse()
+    .map((item: any) => {
+      if (item.severity === 'CRITICAL') return 100;
+      if (item.severity === 'HIGH') return 70;
+      if (item.severity === 'MEDIUM') return 40;
+      return 10;
+    });
+
+  const getRiskColorText = () => {
+    if (riskScore >= 70) return styles.highRiskText;
+    if (riskScore >= 40) return styles.mediumRiskText;
+    return styles.lowRiskText;
+  };
+
+  const getSeverityStyle = (severity: string) => {
+    if (severity === 'CRITICAL') return styles.highRisk;
+    if (severity === 'HIGH') return styles.mediumRisk;
+    return styles.lowRisk;
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar
-        backgroundColor="#0F172A"
-        barStyle="light-content"
-      />
+      <StatusBar backgroundColor="#0F172A" barStyle="light-content" />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContainer}
-      >
-
-        {/* HEADER */}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>
-            Analiz Dashboard
-          </Text>
+          <Text style={styles.headerTitle}>Analiz Dashboard</Text>
 
           <Text style={styles.headerSubTitle}>
-            Gerçek zamanlı risk analizi
+            Backend verilerine göre risk analizi
           </Text>
         </View>
 
-        {/* RISK SCORE */}
         <View style={styles.riskContainer}>
-          <Text style={styles.riskTitle}>
-            Risk Skoru
-          </Text>
+          <Text style={styles.riskTitle}>Risk Skoru</Text>
 
-          <Text style={styles.riskValue}>
-            %{riskScore}
-          </Text>
+          {loading ? (
+            <ActivityIndicator color="#3B82F6" size="large" />
+          ) : (
+            <Text style={[styles.riskValue, getRiskColorText()]}>
+              %{riskScore}
+            </Text>
+          )}
 
           <Text style={styles.riskDescription}>
-            Sistem genel güvenlik durumu
+            Alarm kayıtlarına göre hesaplandı
           </Text>
         </View>
 
-        {/* İSTATİSTİKLER */}
-        <Text style={styles.sectionTitle}>
-          Sistem İstatistikleri
-        </Text>
+        <View style={styles.chartCard}>
+          <Text style={styles.chartTitle}>Risk Trendi</Text>
+
+          <LineChart
+            data={{
+              labels: chartData.length
+                ? chartData.map((_, index) => `${index + 1}`)
+                : ['0'],
+              datasets: [
+                {
+                  data: chartData.length ? chartData : [0],
+                },
+              ],
+            }}
+            width={screenWidth - 60}
+            height={220}
+            yAxisSuffix="%"
+            chartConfig={{
+              backgroundGradientFrom: '#1E293B',
+              backgroundGradientTo: '#1E293B',
+              decimalPlaces: 0,
+              color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`,
+              labelColor: (opacity = 1) =>
+                `rgba(255, 255, 255, ${opacity})`,
+            }}
+            bezier
+            style={styles.chart}
+          />
+        </View>
+
+        <Text style={styles.sectionTitle}>Sistem İstatistikleri</Text>
 
         <View style={styles.gridContainer}>
-
           <View style={styles.statCard}>
-            <Text style={styles.statLabel}>
-              Toplam Alarm
-            </Text>
-
-            <Text style={styles.statValue}>
-              {analytics.totalAlerts}
-            </Text>
+            <Text style={styles.statLabel}>Toplam Alarm</Text>
+            <Text style={styles.statValue}>{analytics.totalAlerts}</Text>
           </View>
 
           <View style={styles.statCard}>
-            <Text style={styles.statLabel}>
-              Güvenli Durum
-            </Text>
-
-            <Text style={styles.statValue}>
-              %{analytics.safeStatus}
-            </Text>
+            <Text style={styles.statLabel}>Güvenli Durum</Text>
+            <Text style={styles.statValue}>%{analytics.safeStatus}</Text>
           </View>
 
           <View style={styles.statCard}>
-            <Text style={styles.statLabel}>
-              Sensör Doğruluğu
-            </Text>
-
-            <Text style={styles.statValue}>
-              %{analytics.sensorAccuracy}
-            </Text>
+            <Text style={styles.statLabel}>Sensör Doğruluğu</Text>
+            <Text style={styles.statValue}>%{analytics.sensorAccuracy}</Text>
           </View>
 
           <View style={styles.statCard}>
-            <Text style={styles.statLabel}>
-              Aktif Cihaz
-            </Text>
-
-            <Text style={styles.statValue}>
-              {analytics.activeDevices}
-            </Text>
+            <Text style={styles.statLabel}>Aktif Cihaz</Text>
+            <Text style={styles.statValue}>{analytics.activeDevices}</Text>
           </View>
-
         </View>
 
-        {/* ANOMALİLER */}
-        <Text style={styles.sectionTitle}>
-          Anomali Tespitleri
-        </Text>
+        <Text style={styles.sectionTitle}>Son Anomali Tespitleri</Text>
 
-        {anomalyData.map((item) => (
-          <View
-            key={item.id}
-            style={styles.anomalyCard}
-          >
-            <View>
-              <Text style={styles.anomalyTitle}>
-                {item.title}
-              </Text>
+        {loading ? (
+          <ActivityIndicator color="#3B82F6" size="large" />
+        ) : alarms.length === 0 ? (
+          <View style={styles.infoCard}>
+            <Text style={styles.infoTitle}>Alarm Kaydı Yok</Text>
 
-              <Text style={styles.anomalyValue}>
-                Veri: {item.value}
-              </Text>
-            </View>
-
-            <View
-              style={[
-                styles.riskBadge,
-
-                item.risk === 'Yüksek Risk'
-                  ? styles.highRisk
-                  : item.risk === 'Orta Risk'
-                  ? styles.mediumRisk
-                  : styles.lowRisk,
-              ]}
-            >
-              <Text style={styles.riskBadgeText}>
-                {item.risk}
-              </Text>
-            </View>
+            <Text style={styles.infoText}>
+              Şu anda sistemde kayıtlı bir anomali veya alarm bulunmuyor.
+            </Text>
           </View>
-        ))}
+        ) : (
+          alarms.slice(0, 5).map((item, index) => (
+            <View key={item._id || index} style={styles.anomalyCard}>
+              <View style={styles.anomalyContent}>
+                <Text style={styles.anomalyTitle}>{item.type}</Text>
 
-        {/* ANALİZ AÇIKLAMASI */}
+                <Text style={styles.anomalyValue}>
+                  {item.description || 'Açıklama yok'}
+                </Text>
+
+                <Text style={styles.anomalyDate}>
+                  {item.createdAt
+                    ? new Date(item.createdAt).toLocaleString()
+                    : ''}
+                </Text>
+              </View>
+
+              <View style={[styles.riskBadge, getSeverityStyle(item.severity)]}>
+                <Text style={styles.riskBadgeText}>{item.severity}</Text>
+              </View>
+            </View>
+          ))
+        )}
+
         <View style={styles.infoCard}>
-          <Text style={styles.infoTitle}>
-            Analiz Motoru
-          </Text>
+          <Text style={styles.infoTitle}>Analiz Motoru</Text>
 
           <Text style={styles.infoText}>
-            Sistem; ivmeölçer, GPS ve hareket
-            verilerini analiz ederek anormal
-            durumları eşik tabanlı yöntemlerle
-            tespit etmektedir.
+            Sistem; ivmeölçer, GPS, batarya ve cihaz durum verilerini Node.js
+            backend üzerinde analiz ederek riskli durumları alarm kaydı olarak
+            oluşturmaktadır.
           </Text>
         </View>
-
       </ScrollView>
     </SafeAreaView>
   );
@@ -229,15 +303,44 @@ const styles = StyleSheet.create({
   },
 
   riskValue: {
-    color: '#22C55E',
     fontSize: 54,
     fontWeight: 'bold',
     marginVertical: 10,
   },
 
+  lowRiskText: {
+    color: '#22C55E',
+  },
+
+  mediumRiskText: {
+    color: '#F59E0B',
+  },
+
+  highRiskText: {
+    color: '#EF4444',
+  },
+
   riskDescription: {
     color: '#94A3B8',
     fontSize: 14,
+  },
+
+  chartCard: {
+    backgroundColor: '#1E293B',
+    padding: 20,
+    borderRadius: 20,
+    marginBottom: 25,
+  },
+
+  chartTitle: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 16,
+  },
+
+  chart: {
+    borderRadius: 20,
   },
 
   sectionTitle: {
@@ -284,6 +387,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
+  anomalyContent: {
+    flex: 1,
+    paddingRight: 12,
+  },
+
   anomalyTitle: {
     color: 'white',
     fontSize: 16,
@@ -293,6 +401,12 @@ const styles = StyleSheet.create({
   anomalyValue: {
     color: '#94A3B8',
     marginTop: 6,
+  },
+
+  anomalyDate: {
+    color: '#64748B',
+    marginTop: 6,
+    fontSize: 12,
   },
 
   riskBadge: {

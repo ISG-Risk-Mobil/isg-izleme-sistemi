@@ -11,9 +11,15 @@ router.post('/', protect, async (req, res) => {
     const { deviceId, accelerometer, location, gyroscope, batteryLevel } = req.body;
 
     if (accelerometer) {
-      accelerometer.magnitude = Math.sqrt(
-        accelerometer.x**2 + accelerometer.y**2 + accelerometer.z**2
+      const magnitudeMs2 = Math.sqrt(
+        accelerometer.x ** 2 +
+        accelerometer.y ** 2 +
+        accelerometer.z ** 2
       );
+
+      accelerometer.magnitude = Math.abs(
+        magnitudeMs2 - 9.81
+      ) / 9.81;
     }
 
     const log = await SensorLog.create({
@@ -26,7 +32,16 @@ router.post('/', protect, async (req, res) => {
     const lastLogs = await SensorLog.find({ deviceId })
       .sort({ timestamp: -1 }).limit(10);
 
-    const detectedAlarms = analyzeSensorData(req.body, lastLogs);
+    console.log('MAGNITUDE:', accelerometer?.magnitude);
+    const detectedAlarms = analyzeSensorData(
+      {
+        accelerometer,
+        location,
+        gyroscope,
+        batteryLevel,
+      },
+      lastLogs
+    );
 
     const savedAlarms = [];
     for (const alarmData of detectedAlarms) {

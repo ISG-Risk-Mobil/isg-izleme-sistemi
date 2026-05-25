@@ -8,43 +8,113 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
+  Alert,
 } from 'react-native';
 
 import { useAuth } from '../../context/AuthContext';
+import { getDevices } from '../../services/api/deviceService';
+import { sendSensorData } from '../../services/api/sensorService';
+import { getSensorPayload } from '../../services/sensors/sensorService';
 
 const HomeScreen = ({ navigation }: any) => {
-  const { logout, user } = useAuth();
+  const { logout, user, token } = useAuth();
 
-  const [systemStatus, setSystemStatus] = useState('AKTİF');
+  const [systemStatus] = useState('AKTİF');
   const [riskLevel, setRiskLevel] = useState('DÜŞÜK');
+  const [activeDevice, setActiveDevice] = useState<any>(null);
+  const [sending, setSending] = useState(false);
 
-  // DEMO VERİLER
   const liveData = {
-    acceleration: '1.24 g',
+    acceleration: 'Gerçek veri hazır',
     location: 'BTÜ Kampüsü',
-    battery: '%82',
-    network: 'WiFi',
-    lastUpdate: '2 sn önce',
+    battery: 'Sensörden alınacak',
+    network: 'Aktif',
+    lastUpdate: activeDevice?.lastSeen
+      ? new Date(activeDevice.lastSeen).toLocaleString()
+      : 'Henüz veri yok',
   };
 
   const alerts = [
     {
       id: 1,
-      title: 'Ani Hareket Algılandı',
-      time: '14:32',
-      level: 'Orta',
-    },
-    {
-      id: 2,
-      title: 'GPS Konum Güncellendi',
-      time: '14:28',
+      title: 'Sistem hazır',
+      time: 'Canlı',
       level: 'Bilgi',
     },
   ];
 
   useEffect(() => {
-    // İleride socket.io canlı veri burada çalışacak
-  }, []);
+    fetchActiveDevice();
+  }, [token]);
+
+  const fetchActiveDevice = async () => {
+    if (!token) return;
+
+    const response = await getDevices(token);
+
+    if (response.success) {
+      const device = response.devices?.find(
+        (item: any) => item.isActive,
+      );
+
+      setActiveDevice(device || null);
+    }
+  };
+
+  const handleSendSensorData = async () => {
+    if (!token) {
+      Alert.alert('Hata', 'Token bulunamadı');
+      return;
+    }
+
+    if (!activeDevice) {
+      Alert.alert(
+        'Hata',
+        'Aktif cihaz bulunamadı. Önce cihaz kaydı oluşturulmalı.',
+      );
+      return;
+    }
+
+    try {
+      setSending(true);
+
+      const payload = await getSensorPayload();
+
+      const response = await sendSensorData(token, {
+        deviceId: activeDevice._id,
+        ...payload,
+      });
+
+      if (response.success) {
+        if (response.alarms?.length > 0) {
+          setRiskLevel('YÜKSEK');
+        } else {
+          setRiskLevel('DÜŞÜK');
+        }
+
+        Alert.alert(
+          'Başarılı',
+          `Sensör verisi gönderildi. Alarm sayısı: ${
+            response.alarms?.length || 0
+          }`,
+        );
+
+        fetchActiveDevice();
+      } else {
+        Alert.alert(
+          'Hata',
+          response.message || 'Sensör verisi gönderilemedi',
+        );
+      }
+    } catch (error: any) {
+      Alert.alert(
+        'Sensör Hatası',
+        error.message || 'Sensör verisi alınamadı',
+      );
+    } finally {
+      setSending(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -57,8 +127,6 @@ const HomeScreen = ({ navigation }: any) => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContainer}
       >
-
-        {/* HEADER */}
         <View style={styles.header}>
           <View>
             <Text style={styles.welcomeText}>
@@ -81,69 +149,77 @@ const HomeScreen = ({ navigation }: any) => {
           </View>
         </View>
 
-        {/* RİSK KARTI */}
+        <View style={styles.deviceCard}>
+          <Text style={styles.cardTitle}>
+            Aktif Cihaz
+          </Text>
+
+          <Text style={styles.deviceName}>
+            {activeDevice
+              ? activeDevice.name
+              : 'Aktif cihaz bulunamadı'}
+          </Text>
+
+          {activeDevice && (
+            <Text style={styles.deviceSubText}>
+              Cihaz Kodu: {activeDevice.deviceId}
+            </Text>
+          )}
+        </View>
+
         <View style={styles.riskCard}>
           <Text style={styles.cardTitle}>
             Güncel Risk Durumu
           </Text>
 
-          <Text style={styles.riskLevel}>
+          <Text
+            style={[
+              styles.riskLevel,
+              riskLevel === 'YÜKSEK' && styles.highRiskText,
+            ]}
+          >
             {riskLevel}
           </Text>
 
           <Text style={styles.cardSubText}>
-            Son 24 saatlik analiz sonucu
+            Son gönderilen sensör verisine göre
           </Text>
         </View>
 
-        {/* CANLI VERİLER */}
         <Text style={styles.sectionTitle}>
           Canlı Sensör Verileri
         </Text>
 
         <View style={styles.dataGrid}>
           <View style={styles.dataCard}>
-            <Text style={styles.dataLabel}>
-              İvme
-            </Text>
-
+            <Text style={styles.dataLabel}>İvme</Text>
             <Text style={styles.dataValue}>
               {liveData.acceleration}
             </Text>
           </View>
 
           <View style={styles.dataCard}>
-            <Text style={styles.dataLabel}>
-              Batarya
-            </Text>
-
+            <Text style={styles.dataLabel}>Batarya</Text>
             <Text style={styles.dataValue}>
               {liveData.battery}
             </Text>
           </View>
 
           <View style={styles.dataCard}>
-            <Text style={styles.dataLabel}>
-              Ağ
-            </Text>
-
+            <Text style={styles.dataLabel}>Ağ</Text>
             <Text style={styles.dataValue}>
               {liveData.network}
             </Text>
           </View>
 
           <View style={styles.dataCard}>
-            <Text style={styles.dataLabel}>
-              Güncelleme
-            </Text>
-
-            <Text style={styles.dataValue}>
+            <Text style={styles.dataLabel}>Güncelleme</Text>
+            <Text style={styles.dataValueSmall}>
               {liveData.lastUpdate}
             </Text>
           </View>
         </View>
 
-        {/* KONUM */}
         <View style={styles.locationCard}>
           <Text style={styles.cardTitle}>
             Son Konum
@@ -154,13 +230,14 @@ const HomeScreen = ({ navigation }: any) => {
           </Text>
         </View>
 
-        {/* ALARMLAR */}
         <View style={styles.alertHeader}>
           <Text style={styles.sectionTitle}>
             Son Alarm Kayıtları
           </Text>
 
-          <TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Alarmlar')}
+          >
             <Text style={styles.viewAllText}>
               Tümünü Gör
             </Text>
@@ -190,7 +267,6 @@ const HomeScreen = ({ navigation }: any) => {
           </View>
         ))}
 
-        {/* HIZLI İŞLEMLER */}
         <Text style={styles.sectionTitle}>
           Hızlı İşlemler
         </Text>
@@ -198,30 +274,32 @@ const HomeScreen = ({ navigation }: any) => {
         <View style={styles.actionContainer}>
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => navigation.navigate('LiveData')}
+            onPress={() => navigation.navigate('Dashboard')}
           >
             <Text style={styles.actionButtonText}>
-              Canlı İzleme
+              Analiz
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => navigation.navigate('Reports')}
+            onPress={() => navigation.navigate('Cihazlar')}
           >
             <Text style={styles.actionButtonText}>
-              Raporlar
+              Cihazlar
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* ÇIKIŞ */}
         <TouchableOpacity
-          style={styles.logoutButton}
-          onPress={logout}
+          style={styles.sensorButton}
+          onPress={handleSendSensorData}
+          disabled={sending}
         >
-          <Text style={styles.logoutText}>
-            Çıkış Yap
+          <Text style={styles.actionButtonText}>
+            {sending
+              ? 'Gönderiliyor...'
+              : 'Sensör Verisi Gönder'}
           </Text>
         </TouchableOpacity>
 
@@ -282,6 +360,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 
+  deviceCard: {
+    backgroundColor: '#1E293B',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 20,
+  },
+
+  deviceName: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+
+  deviceSubText: {
+    color: '#94A3B8',
+    marginTop: 8,
+  },
+
   riskCard: {
     backgroundColor: '#1E293B',
     borderRadius: 20,
@@ -299,6 +395,10 @@ const styles = StyleSheet.create({
     color: '#22C55E',
     fontSize: 34,
     fontWeight: 'bold',
+  },
+
+  highRiskText: {
+    color: '#EF4444',
   },
 
   cardSubText: {
@@ -338,7 +438,13 @@ const styles = StyleSheet.create({
 
   dataValue: {
     color: 'white',
-    fontSize: 20,
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+
+  dataValueSmall: {
+    color: 'white',
+    fontSize: 13,
     fontWeight: 'bold',
   },
 
@@ -388,14 +494,14 @@ const styles = StyleSheet.create({
   },
 
   alertBadge: {
-    backgroundColor: '#3F1D1D',
+    backgroundColor: '#1E3A8A',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 10,
   },
 
   alertBadgeText: {
-    color: '#F87171',
+    color: '#BFDBFE',
     fontWeight: 'bold',
     fontSize: 12,
   },
@@ -411,6 +517,14 @@ const styles = StyleSheet.create({
     width: '48%',
     paddingVertical: 16,
     borderRadius: 16,
+    alignItems: 'center',
+  },
+
+  sensorButton: {
+    backgroundColor: '#16A34A',
+    paddingVertical: 16,
+    borderRadius: 16,
+    marginTop: 16,
     alignItems: 'center',
   },
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, {useState} from 'react';
 
 import {
   View,
@@ -10,15 +10,14 @@ import {
   StatusBar,
 } from 'react-native';
 
-import COLORS from '../../constants/colors';
 import CustomButton from '../../components/common/CustomButton';
 import CustomInput from '../../components/common/CustomInput';
 
-import { loginUser } from '../../services/api/authService';
-import { useAuth } from '../../context/AuthContext';
+import {loginUser} from '../../services/api/authService';
+import {useAuth} from '../../context/AuthContext';
 
-const LoginScreen = ({ navigation }: any) => {
-  const { login } = useAuth();
+const LoginScreen = ({navigation}: any) => {
+  const {login} = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -26,10 +25,7 @@ const LoginScreen = ({ navigation }: any) => {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert(
-        'Eksik Bilgi',
-        'E-posta ve şifre zorunludur',
-      );
+      Alert.alert('Eksik Bilgi', 'E-posta ve şifre zorunludur');
       return;
     }
 
@@ -41,27 +37,17 @@ const LoginScreen = ({ navigation }: any) => {
       if (data?.token) {
         await login(data.token, data.user);
 
-        Alert.alert(
-          'Başarılı',
-          'Sisteme giriş yapıldı',
-        );
+        Alert.alert('Başarılı', 'Sisteme giriş yapıldı');
       } else {
-        Alert.alert(
-          'Hata',
-          data?.message || 'Giriş başarısız',
-        );
+        Alert.alert('Hata', data?.message || 'Giriş başarısız');
       }
-
     } catch (error: any) {
       const errorMessage =
         error.response?.data?.message ||
         error.message ||
         'Sunucu bağlantı hatası';
 
-      Alert.alert(
-        'Giriş Başarısız',
-        errorMessage,
-      );
+      Alert.alert('Giriş Başarısız', errorMessage);
     } finally {
       setLoading(false);
     }
@@ -69,16 +55,11 @@ const LoginScreen = ({ navigation }: any) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar
-        backgroundColor="#0F172A"
-        barStyle="light-content"
-      />
+      <StatusBar backgroundColor="#0F172A" barStyle="light-content" />
 
       {/* ÜST ALAN */}
       <View style={styles.header}>
-        <Text style={styles.logo}>
-          VISIONGUARD
-        </Text>
+        <Text style={styles.logo}>VISIONGUARD</Text>
 
         <Text style={styles.subtitle}>
           Mobil Güvenlik ve Davranış Analizi Platformu
@@ -87,17 +68,13 @@ const LoginScreen = ({ navigation }: any) => {
         <View style={styles.liveBadge}>
           <View style={styles.liveDot} />
 
-          <Text style={styles.liveText}>
-            Sensör Sistemi Aktif
-          </Text>
+          <Text style={styles.liveText}>Sensör Sistemi Aktif</Text>
         </View>
       </View>
 
       {/* FORM */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>
-          Kullanıcı Girişi
-        </Text>
+        <Text style={styles.cardTitle}>Kullanıcı Girişi</Text>
 
         <CustomInput
           label="E-Posta"
@@ -117,32 +94,27 @@ const LoginScreen = ({ navigation }: any) => {
         />
 
         <CustomButton
-          title={
-            loading
-              ? 'Giriş yapılıyor...'
-              : 'Giriş Yap'
-          }
+          title={loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
           onPress={handleLogin}
           disabled={loading}
         />
 
-        <TouchableOpacity
-          style={styles.registerButton}
-          onPress={() =>
-            navigation.navigate('Register')
-          }
-        >
-          <Text style={styles.registerText}>
-            Hesabın yok mu? Kayıt Ol
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.linkContainer}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('ForgotPassword')}>
+            <Text style={styles.forgotText}>Şifremi Unuttum</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+            <Text style={styles.registerText}>Hesabın yok mu? Kayıt Ol</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* ALT BİLGİ */}
       <View style={styles.footer}>
         <Text style={styles.footerText}>
-          Gerçek zamanlı sensör analizi •
-          Node.js Backend • JWT Security
+          Gerçek zamanlı sensör analizi • Node.js Backend • JWT Security
         </Text>
       </View>
     </SafeAreaView>
@@ -216,11 +188,6 @@ const styles = StyleSheet.create({
     marginBottom: 25,
   },
 
-  registerButton: {
-    marginTop: 22,
-    alignItems: 'center',
-  },
-
   registerText: {
     color: '#60A5FA',
     fontWeight: '600',
@@ -235,5 +202,16 @@ const styles = StyleSheet.create({
     color: '#64748B',
     fontSize: 12,
     textAlign: 'center',
+  },
+
+  forgotText: {
+    color: '#94A3B8',
+    fontSize: 14,
+  },
+
+  linkContainer: {
+    marginTop: 22,
+    alignItems: 'center',
+    gap: 14,
   },
 });
