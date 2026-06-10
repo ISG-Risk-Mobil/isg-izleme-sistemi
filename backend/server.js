@@ -419,7 +419,7 @@ app.post('/sensor', authMiddleware, async (req, res) => {
     // Socket.io ile canlı yayın
     io.emit('sensorData', {
       riskCount: risks.length,
-      personnelCount: 12, // İstersen veritabanından dinamik çekebilirsin
+      personnelCount: 12, 
       status: risks.length > 0 ? "Kritik" : "Güvenli",
       lastSensorValue: sensorData.value
     });
