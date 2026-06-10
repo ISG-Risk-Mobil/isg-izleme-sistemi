@@ -26,37 +26,23 @@ const handleSubmit = async (e) => {
   const API_URL = 'http://localhost:5000/api';
 
   try {
-    let userData;
-
-    if (res.data.token) {
-  localStorage.setItem('token', res.data.token);
-  localStorage.setItem('role', res.data.user?.role || 'worker');
-  
-  // App.jsx'in beklediği veriyi buraya gönderiyoruz:
-  onLogin({
-    token: res.data.token,
-    role: res.data.user?.role || 'worker',
-    name: res.data.user?.name || 'Kullanıcı'
-  });
-
+    if (isLogin) {
+      // GİRİŞ İŞLEMİ
+      const res = await axios.post(`${API_URL}/auth/login`, { email, password });
+      localStorage.setItem('token', res.data.token);
+      localStorage.setItem('role', res.data.user.role);
+      onLogin({ token: res.data.token, role: res.data.user.role, name: res.data.user.name });
     } else {
+      // KAYIT İŞLEMİ
       const res = await axios.post(`${API_URL}/auth/register`, {
-        name,
-        email,
-        password,
-        role,
-        department
+        name, email, password, role, department
       });
-      userData = {
-        token: res.data.token,
-        role: res.data.user.role,
-        name: res.data.user.name
-      };
+      // Kayıt başarılıysa giriş sayfasına dön veya otomatik giriş yap
+      alert("Hesap başarıyla oluşturuldu! Lütfen giriş yapın.");
+      setIsLogin(true); 
     }
-
-    onLogin(userData); // App.jsx'teki handleLogin tetiklenir → setIsLoggedIn(true)
-
   } catch (err) {
+    console.error(err);
     alert("Hata: " + (err.response?.data?.message || "İşlem başarısız"));
   }
 };
@@ -84,7 +70,7 @@ const handleSubmit = async (e) => {
               <div style={inputContainer}>
                 <label style={labelStyle}>Yetki Seviyesi</label>
                 <select value={role} onChange={(e) => setRole(e.target.value)} style={{...inputStyle, backgroundColor: '#0f172a', cursor: 'pointer'}}>
-                  <option value="personel">Personel</option>
+                  <option value="worker">Worker</option>
                   <option value="admin">Yönetici (Admin)</option>
                 </select>
               </div>
