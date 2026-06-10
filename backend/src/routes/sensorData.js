@@ -9,7 +9,20 @@ const { analyzeSensorData } = require('../services/analysisService');
 router.post('/', protect, async (req, res) => {
   try {
     const { deviceId, accelerometer, location, gyroscope, batteryLevel } = req.body;
+    const deviceQuery = { _id: deviceId };
 
+    if (req.user.role !== 'admin') {
+      deviceQuery.assignedUser = req.user._id;
+    }
+
+    const device = await Device.findOne(deviceQuery);
+
+    if (!device) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bu cihaz için sensör verisi gönderme yetkiniz yok',
+      });
+    }
     if (accelerometer) {
       const magnitudeMs2 = Math.sqrt(
         accelerometer.x ** 2 +

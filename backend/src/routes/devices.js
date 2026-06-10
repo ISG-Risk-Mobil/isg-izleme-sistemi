@@ -5,8 +5,15 @@ const Device = require('../models/Device');
 
 router.get('/', protect, async (req, res) => {
   try {
-    const devices = await Device.find()
+    const query = {};
+
+    if (req.user.role !== 'admin') {
+      query.assignedUser = req.user._id;
+    }
+
+    const devices = await Device.find(query)
       .populate('assignedUser', 'name email department');
+
     res.json({ success: true, devices });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

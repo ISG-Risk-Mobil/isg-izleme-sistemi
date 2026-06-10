@@ -3,6 +3,7 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
+const Device = require('../models/Device');
 const { protect } = require('../middleware/auth');
 
 const generateToken = (id) => {
@@ -23,16 +24,39 @@ router.post('/register', async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    const user = await User.create({ 
-      name, email, 
-      password: hashedPassword, 
-      role, department 
+    const user = await User.create({
+      name,
+      email,
+      password: hashedPassword,
+      role: role || 'worker',
+      department,
     });
 
+    let device = null;
+
+    if (user.role === 'worker') {
+      device = await Device.create({
+        deviceId: `AUTO-${user._id}`,
+        name: `${user.name} Varsayılan Cihazı`,
+        assignedUser: user._id,
+        isActive: true,
+      });
+    }
+
     const token = generateToken(user._id);
-    res.status(201).json({ 
-      success: true, token, 
-      user: { id: user._id, name: user.name, email: user.email, role: user.role }
+
+    res.status(201).json({
+      success: true,
+      token,
+      user: {
+        id: user._id,
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        department: user.department,
+      },
+      device,
     });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -54,9 +78,17 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ success: false, message: 'Gecersiz email veya sifre' });
     }
     const token = generateToken(user._id);
-    res.json({ 
-      success: true, token, 
-      user: { id: user._id, name: user.name, email: user.email, role: user.role }
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: user._id,
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        department: user.department,
+      },
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -66,7 +98,6 @@ router.post('/login', async (req, res) => {
 router.get('/me', protect, async (req, res) => {
   res.json({ success: true, user: req.user });
 });
- //EKLENDİ 
 // Admin'in tüm kullanıcıları görmesini sağlayan rota
 router.get('/users', protect, async (req, res) => {
   try {

@@ -1,12 +1,30 @@
 import { apiCall } from './api';
 
+export type SensorDataPayload = {
+  deviceId: string;
+  accelerometer?: {
+    x: number;
+    y: number;
+    z: number;
+  };
+  gyroscope?: {
+    x: number;
+    y: number;
+    z: number;
+  };
+  location?: {
+    latitude: number;
+    longitude: number;
+    accuracy?: number;
+  };
+  batteryLevel?: number;
+};
+
 export const sendSensorData = (
   token: string,
-  sensorData: any,
+  sensorData: SensorDataPayload,
 ) => {
   return apiCall({
-
-    
     endpoint: '/sensor-data',
     method: 'POST',
     token,

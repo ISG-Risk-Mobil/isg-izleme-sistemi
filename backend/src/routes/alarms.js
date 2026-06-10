@@ -6,14 +6,28 @@ const Alarm = require('../models/Alarm');
 router.get('/', protect, async (req, res) => {
   try {
     const { resolved, severity, type } = req.query;
+
     let query = {};
-    if (resolved !== undefined) query.resolved = resolved === 'true';
-    if (severity) query.severity = severity;
-    if (type) query.type = type;
+
+    if (req.user.role !== 'admin') {
+      query.userId = req.user._id;
+    }
+
+    if (resolved !== undefined) {
+      query.resolved = resolved === 'true';
+    }
+
+    if (severity) {
+      query.severity = severity;
+    }
+
+    if (type) {
+      query.type = type;
+    }
 
     const alarms = await Alarm.find(query)
       .populate('deviceId', 'name deviceId')
-      .populate('userId', 'name')
+      .populate('userId', 'name email department')
       .sort({ createdAt: -1 })
       .limit(100);
 
@@ -25,11 +39,22 @@ router.get('/', protect, async (req, res) => {
 
 router.put('/:id/resolve', protect, async (req, res) => {
   try {
-    const alarm = await Alarm.findByIdAndUpdate(
-      req.params.id,
-      { resolved: true, resolvedAt: new Date(), resolvedBy: req.user._id },
+const query = { _id: req.params.id };
+
+if (req.user.role !== 'admin') {
+  query.userId = req.user._id;
+}
+
+    const alarm = await Alarm.findOneAndUpdate(
+      query,
+      {
+        resolved: true,
+        resolvedAt: new Date(),
+        resolvedBy: req.user._id,
+      },
       { new: true }
     );
+    
     if (!alarm) {
       return res.status(404).json({ success: false, message: 'Alarm bulunamadı' });
     }
