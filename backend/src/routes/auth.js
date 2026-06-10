@@ -66,5 +66,21 @@ router.post('/login', async (req, res) => {
 router.get('/me', protect, async (req, res) => {
   res.json({ success: true, user: req.user });
 });
+ //EKLENDİ 
+// Admin'in tüm kullanıcıları görmesini sağlayan rota
+router.get('/users', protect, async (req, res) => {
+  try {
+    // Sadece admin veya yönetici rolüne sahip olanlar erişebilir
+    if (req.user.role !== 'admin' && req.user.role !== 'yönetici') {
+      return res.status(403).json({ success: false, message: 'Bu alana erişim yetkiniz yok' });
+    }
+
+    // Veritabanındaki tüm kullanıcıları çek (şifreleri hariç tutmak için select('-password') kullanabilirsiniz)
+    const users = await User.find({}).select('-password');
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Kullanıcılar getirilemedi: ' + err.message });
+  }
+});
 
 module.exports = router;

@@ -1,138 +1,134 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { Eye, EyeOff, Shield, UserPlus } from 'lucide-react';
 
 const RENKLER = {
-  navy: '#0F172A',
-  accent: '#F59e0b',
-  text: '#F8FAFC'
+  navy: '#0B1120',
+  accent: '#EAB308',
+  textMain: '#F1F5F9',
+  textMuted: '#94A3B8',
+  border: 'rgba(255, 255, 255, 0.1)'
 };
-
-const API_URL = 'http://localhost:5000/api';
 
 function LoginPage({ baslangicKayitMi, onLogin }) {
   const [isLogin, setIsLogin] = useState(!baslangicKayitMi);
+  const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [department, setDepartment] = useState('Genel'); // 'genel' yerine 'Genel' olarak güncelledim
-  const [role, setRole] = useState('worker');
+  // Yeni eklenen alanlar
+  const [role, setRole] = useState('personel'); 
+  const [department, setDepartment] = useState('');
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  // LoginPage.jsx içinde:
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  const API_URL = 'http://localhost:5000/api';
 
-    try {
-      if (isLogin) {
-        // GİRİŞ İŞLEMİ
-        const response = await axios.post(`${API_URL}/auth/login`, { email, password });
-        
-        const { token, user } = response.data;
-        
-        // Verileri localStorage'a kaydet (Profil sayfası buradan okuyacak)
-        localStorage.setItem('token', token);
-        localStorage.setItem('role', user.role);
-        localStorage.setItem('userEmail', user.email);
-        localStorage.setItem('userName', user.name);
-        localStorage.setItem('userDept', user.department || 'Genel');
+  try {
+    let userData;
 
-        const girisZamani = new Date().toLocaleString('tr-TR', {
-        day: '2-digit', month: '2-digit', year: 'numeric',
-        hour: '2-digit', minute: '2-digit'
+    if (res.data.token) {
+  localStorage.setItem('token', res.data.token);
+  localStorage.setItem('role', res.data.user?.role || 'worker');
+  
+  // App.jsx'in beklediği veriyi buraya gönderiyoruz:
+  onLogin({
+    token: res.data.token,
+    role: res.data.user?.role || 'worker',
+    name: res.data.user?.name || 'Kullanıcı'
+  });
+
+    } else {
+      const res = await axios.post(`${API_URL}/auth/register`, {
+        name,
+        email,
+        password,
+        role,
+        department
       });
-      localStorage.setItem('lastLogin', girisZamani);
-        
-        alert(`Hoş geldin ${user.name}!`);
-        
-        if (onLogin) {
-          onLogin(user.role);
-        }
-        
-      } else {
-        // KAYIT İŞLEMİ
-        await axios.post(`${API_URL}/auth/register`, {
-          name,
-          email,
-          password,
-          role,
-          department
-        });
-        
-        alert('Kayıt başarılı! Şimdi giriş yapabilirsiniz.');
-        setIsLogin(true); // Kayıttan sonra giriş ekranına dön
-      }
-    } catch (error) {
-      alert(error.response?.data?.message || 'İşlem başarısız!');
+      userData = {
+        token: res.data.token,
+        role: res.data.user.role,
+        name: res.data.user.name
+      };
     }
-  };
+
+    onLogin(userData); // App.jsx'teki handleLogin tetiklenir → setIsLoggedIn(true)
+
+  } catch (err) {
+    alert("Hata: " + (err.response?.data?.message || "İşlem başarısız"));
+  }
+};
 
   return (
-    <div style={glassCardStyle}>
-      <div style={logoWrapper}>
-        <div style={iconStyle}>{isLogin ? '🛡️' : '✍️'}</div>
-        <h1 style={titleStyle}>VISION<span style={{color: RENKLER.accent}}>GUARD</span></h1>
-        <p style={subtitleStyle}>{isLogin ? 'Sisteme Giriş Yap' : 'Yeni Personel Kaydı'}</p>
-      </div>
-
-      <form onSubmit={handleSubmit} style={formStyle}>
-        {!isLogin && (
-          <>
-            <div style={inputContainer}>
-              <label style={labelStyle}>Ad Soyad</label>
-              <input type="text" placeholder="Ad Soyad" style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} required />
-            </div>
-            
-            <div style={inputContainer}>
-              <label style={labelStyle}>Departman</label>
-              <select style={inputStyle} value={department} onChange={(e) => setDepartment(e.target.value)}>
-                <option value="Genel">Genel</option>
-                <option value="Bursa">Bursa Fabrika</option>
-                <option value="Bakım">Bakım Onarım</option>
-                <option value="Lojistik">Lojistik</option>
-              </select>
-            </div>
-
-            <div style={inputContainer}>
-              <label style={labelStyle}>Rol Seçimi</label>
-              <select style={inputStyle} value={role} onChange={(e) => setRole(e.target.value)}>
-                <option value="worker">Personel</option>
-                <option value="admin">Yönetici</option>
-              </select>
-            </div>
-          </>
-        )}
-
-        <div style={inputContainer}>
-          <label style={labelStyle}>Personel E-Posta</label>
-          <input type="email" placeholder="isim.soyisim@sirket.com" style={inputStyle} value={email} onChange={(e) => setEmail(e.target.value)} required />
+    <div style={pageContainer}>
+      <div style={glassCardStyle}>
+        <div style={logoWrapper}>
+          <div style={iconStyle}>{isLogin ? <Shield size={32} /> : <UserPlus size={32} />}</div>
+          <h1 style={titleStyle}>VISION<span style={{color: RENKLER.accent}}>GUARD</span></h1>
+          <p style={subtitleStyle}>{isLogin ? 'Sisteme giriş yaparak devam edin' : 'Kurumsal hesabınızı oluşturun'}</p>
         </div>
 
-        <div style={inputContainer}>
-          <label style={labelStyle}>Şifre</label>
-          <input type="password" placeholder="••••••••" style={inputStyle} value={password} onChange={(e) => setPassword(e.target.value)} required />
-        </div>
+        <form onSubmit={handleSubmit} style={formStyle}>
+          {!isLogin && (
+            <>
+              <div style={inputContainer}>
+                <label style={labelStyle}>Ad Soyad</label>
+                <input type="text" value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} required />
+              </div>
+              <div style={inputContainer}>
+                <label style={labelStyle}>Departman</label>
+                <input type="text" placeholder="Örn: Üretim, Lojistik" value={department} onChange={(e) => setDepartment(e.target.value)} style={inputStyle} required />
+              </div>
+              <div style={inputContainer}>
+                <label style={labelStyle}>Yetki Seviyesi</label>
+                <select value={role} onChange={(e) => setRole(e.target.value)} style={{...inputStyle, backgroundColor: '#0f172a', cursor: 'pointer'}}>
+                  <option value="personel">Personel</option>
+                  <option value="admin">Yönetici (Admin)</option>
+                </select>
+              </div>
+            </>
+          )}
 
-        <button type="submit" style={buttonStyle}>
-          {isLogin ? 'SİSTEME GİRİŞ YAP' : 'HESABI OLUŞTUR'}
+          <div style={inputContainer}>
+            <label style={labelStyle}>E-Posta Adresi</label>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} required />
+          </div>
+          
+          <div style={{...inputContainer, position: 'relative'}}>
+            <label style={labelStyle}>Şifre</label>
+            <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} style={inputStyle} required />
+            <button type="button" onClick={() => setShowPassword(!showPassword)} style={eyeButtonStyle}>
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+          
+          <button type="submit" style={buttonStyle}>
+            {isLogin ? 'SİSTEME GİRİŞ YAP' : 'HESABI OLUŞTUR'}
+          </button>
+        </form>
+
+        <button onClick={() => setIsLogin(!isLogin)} style={toggleButton}>
+          {isLogin ? 'Hesabınız yok mu? Kayıt Ol' : 'Zaten üye misiniz? Giriş Yap'}
         </button>
-      </form>
-
-      <button onClick={() => setIsLogin(!isLogin)} style={toggleButton}>
-        {isLogin ? 'Hesabınız yok mu? Kayıt Ol' : 'Zaten üye misiniz? Giriş Yap'}
-      </button>
+      </div>
     </div>
   );
 }
 
-// Stillerin değişmedi, aynı kalıyor
-const glassCardStyle = { background: 'rgba(255, 255, 255, 0.05)', backdropFilter: 'blur(15px)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '24px', padding: '40px', width: '100%', maxWidth: '400px', textAlign: 'center', boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5)', margin: 'auto' };
-const logoWrapper = { marginBottom: '30px' };
-const iconStyle = { fontSize: '40px', marginBottom: '10px' };
-const titleStyle = { color: '#FFFFFF', fontSize: '22px', letterSpacing: '2px', fontWeight: '800', margin: '0' };
-const subtitleStyle = { color: '#94A3B8', fontSize: '12px', textTransform: 'uppercase', marginTop: '5px' };
-const formStyle = { display: 'flex', flexDirection: 'column', gap: '15px' };
-const inputContainer = { textAlign: 'left' };
-const labelStyle = { display: 'block', color: '#CBD5E1', fontSize: '13px', marginBottom: '5px' };
-const inputStyle = { width: '100%', padding: '12px', backgroundColor: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '10px', color: '#FFFFFF', outline: 'none', boxSizing: 'border-box' };
-const buttonStyle = { backgroundColor: RENKLER.accent, color: RENKLER.navy, padding: '14px', borderRadius: '10px', border: 'none', fontWeight: '700', cursor: 'pointer' };
-const toggleButton = { background: 'none', border: 'none', color: RENKLER.accent, marginTop: '20px', cursor: 'pointer', fontSize: '14px', textDecoration: 'underline' };
+const pageContainer = { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' };
+const glassCardStyle = { background: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(20px)', border: `1px solid ${RENKLER.border}`, borderRadius: '24px', padding: '48px', width: '100%', maxWidth: '420px', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.4)' };
+const logoWrapper = { marginBottom: '40px' };
+const iconStyle = { color: RENKLER.accent, background: 'rgba(234, 179, 8, 0.1)', width: '64px', height: '64px', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px auto' };
+const titleStyle = { color: RENKLER.textMain, fontSize: '24px', letterSpacing: '1px', fontWeight: '800', margin: '0' };
+const subtitleStyle = { color: RENKLER.textMuted, fontSize: '14px', marginTop: '8px' };
+const inputStyle = { width: '100%', padding: '14px', marginTop: '8px', backgroundColor: 'rgba(255,255,255,0.03)', border: `1px solid ${RENKLER.border}`, borderRadius: '12px', color: '#FFF', outline: 'none', boxSizing: 'border-box' };
+const buttonStyle = { width: '100%', backgroundColor: RENKLER.accent, color: RENKLER.navy, padding: '14px', borderRadius: '12px', border: 'none', fontWeight: '700', cursor: 'pointer', marginTop: '20px' };
+const labelStyle = { color: RENKLER.textMuted, fontSize: '12px', fontWeight: '600', textTransform: 'uppercase' };
+const inputContainer = { textAlign: 'left', marginBottom: '20px' };
+const formStyle = { display: 'flex', flexDirection: 'column' };
+const toggleButton = { background: 'none', border: 'none', color: RENKLER.textMuted, marginTop: '20px', cursor: 'pointer', fontSize: '13px' };
+const eyeButtonStyle = { position: 'absolute', right: '15px', top: '34px', background: 'none', border: 'none', cursor: 'pointer', color: RENKLER.textMuted };
 
 export default LoginPage;

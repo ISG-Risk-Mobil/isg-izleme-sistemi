@@ -1,19 +1,30 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { AlertTriangle, Activity, User, LogOut, ShieldCheck, Camera, Cpu } from 'lucide-react';
-import { LineChart, Line, XAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import React, { useState, useEffect } from 'react';
+import { AlertTriangle, Activity, User, LogOut, ShieldCheck, Cpu, Users } from 'lucide-react';
+import { LineChart, Line, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import io from 'socket.io-client';
 import ProfilePage from './ProfilePage';
 
-export default function Dashboard({ role, onLogout }) {
+export default function Dashboard({ role, onLogout, onBack }) {
   const [grafikVerisi, setGrafikVerisi] = useState([]);
   const [alarmlar, setAlarmlar] = useState([]);
   const [kullaniciRolu] = useState(role || localStorage.getItem('role') || 'user');
   const [gosterimModu, setGosterimModu] = useState('DASHBOARD');
-  
-  const videoRef = useRef(null);
+  // Dashboard.jsx en üstüne ekleyin
+const [kullaniciListesi, setKullaniciListesi] = useState([]);
+const [seciliKullanici, setSeciliKullanici] = useState(null);
+
+  // Personel - Yönetici ayrımı için tanımlama
+  const isYonetici = kullaniciRolu === 'admin' || kullaniciRolu === 'yönetici';
 
   const styles = {
-    container: { padding: '24px', backgroundColor: '#0f172a', minHeight: '100vh', color: '#f8fafc', fontFamily: 'Inter, sans-serif' },
+    container: { 
+      padding: '24px', 
+      backgroundColor: '#0f172a', 
+      height: '100vh', 
+      overflowY: 'auto', 
+      color: '#f8fafc', 
+      fontFamily: 'Inter, sans-serif' 
+    },
     header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' },
     grid: { display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '20px' },
     card: { backgroundColor: '#1e293b', borderRadius: '16px', padding: '20px', border: '1px solid #334155' },
@@ -21,24 +32,18 @@ export default function Dashboard({ role, onLogout }) {
     profileBtn: { background: '#1e293b', border: '1px solid #f59e0b', color: '#f59e0b', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600' }
   };
 
-  // Kamera Başlatma
-  useEffect(() => {
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      navigator.mediaDevices.getUserMedia({ video: true })
-        .then(stream => { if (videoRef.current) videoRef.current.srcObject = stream; })
-        .catch(err => console.error("Kamera hatası:", err));
-    }
-  }, []);
-
   useEffect(() => {
     const soket = io('http://localhost:5000');
+    
     soket.on('sensor-guncelleme', (yeniVeri) => {
-      const risk = yeniVeri.accelerometer?.magnitude || 0;
+      const risk = yeniVeri.sensorData?.magnitude || 0;
       setGrafikVerisi(onceki => [...onceki.slice(-19), { zaman: new Date().toLocaleTimeString().slice(0, 5), risk: risk }]);
     });
+    
     soket.on('new-alarm', (yeniAlarm) => {
       setAlarmlar(onceki => [yeniAlarm, ...onceki].slice(0, 5));
     });
+    
     return () => soket.disconnect();
   }, []);
 
@@ -53,10 +58,11 @@ export default function Dashboard({ role, onLogout }) {
         user={{ 
           name: localStorage.getItem('userName') || 'Kullanıcı', 
           email: localStorage.getItem('userEmail') || 'Email bulunamadı', 
-          role: localStorage.getItem('role') || kullaniciRolu, 
+          role: kullaniciRolu, 
           department: localStorage.getItem('userDept') || 'Genel' 
         }} 
-        onBack={() => setGosterimModu('DASHBOARD')} 
+        // Burada Dashboard'un aldığı onBack fonksiyonunu ProfilePage'e iletiyoruz
+        geriDon={() => setGosterimModu('DASHBOARD')} 
       />
     );
   }
@@ -78,18 +84,27 @@ export default function Dashboard({ role, onLogout }) {
       </header>
 
       <div style={styles.grid}>
-        {/* Canlı Kamera Akışı */}
-        <div style={{ ...styles.card, gridColumn: 'span 8', position: 'relative' }}>
-          <h3 style={styles.title}><Camera size={16}/> Canlı Saha Analizi (AI Active)</h3>
-          <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', borderRadius: '12px', border: '1px solid #334155' }} />
-          <div style={{ position: 'absolute', top: '90px', left: '40px', border: '2px solid #22c55e', width: '150px', height: '250px', borderRadius: '4px', pointerEvents: 'none' }}>
-            <span style={{ backgroundColor: '#22c55e', color: 'white', fontSize: '10px', padding: '2px 6px', borderRadius: '4px' }}>BARET TESPİT EDİLDİ</span>
+        
+        {/* YÖNETİCİYE ÖZEL BİLGİLENDİRME KARTI */}
+        {isYonetici && (
+          <div style={{ ...styles.card, gridColumn: 'span 12', border: '1px solid #f59e0b' }}>
+            <h3 style={{ ...styles.title, color: '#f59e0b' }}><Users size={16}/> Yönetici Kontrol Paneli</h3>
+            <p style={{ fontSize: '13px', color: '#cbd5e1' }}>Tüm fabrika sahası ve işçi güvenlik verileri anlık olarak izleniyor.</p>
           </div>
+        )}
+
+        <div style={{ ...styles.card, gridColumn: 'span 8', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '300px' }}>
+            <div style={{ textAlign: 'center', color: '#94a3b8' }}>
+                <Cpu size={48} style={{ marginBottom: '10px' }} />
+                <p>{isYonetici ? "Fabrika genel sistem analizi aktif." : "Kişisel çalışma verileri izleniyor."}</p>
+            </div>
         </div>
 
-        {/* Kritik Bildirimler */}
+        {/* Kritik Bildirimler - Role göre başlık değişimi */}
         <div style={{ ...styles.card, gridColumn: 'span 4' }}>
-          <h3 style={styles.title}><AlertTriangle size={16}/> Kritik Bildirimler</h3>
+          <h3 style={styles.title}>
+            <AlertTriangle size={16}/> {isYonetici ? 'Fabrika Genel Alarmları' : 'Kişisel Bildirimlerim'}
+          </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {alarmlar.length === 0 ? <p style={{color:'#64748b', fontSize:'13px'}}>Aktif alarm yok.</p> : alarmlar.map((a, i) => (
               <div key={i} style={{ padding: '10px', backgroundColor: '#0f172a', borderRadius: '8px', fontSize: '13px', borderLeft: '3px solid #ef4444' }}>
@@ -101,12 +116,12 @@ export default function Dashboard({ role, onLogout }) {
 
         {/* Ekipman Durum Paneli */}
         <div style={{ ...styles.card, gridColumn: 'span 12' }}>
-          <h3 style={styles.title}><ShieldCheck size={16}/> Canlı Ekipman Tespit Durumu</h3>
+          <h3 style={styles.title}><ShieldCheck size={16}/> {isYonetici ? 'Fabrika Genel Ekipman Durumu' : 'Kişisel Ekipman Tespit Durumu'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginTop: '10px' }}>
             {[
-              { label: 'Baret', status: 'Tespit Edildi', color: '#22c55e' },
-              { label: 'İş Yeleği', status: 'Tespit Edildi', color: '#22c55e' },
-              { label: 'Eldiven', status: 'Eksik', color: '#ef4444' }
+              { label: 'Baret', status: 'Sistem Bekleniyor', color: '#94a3b8' },
+              { label: 'İş Yeleği', status: 'Sistem Bekleniyor', color: '#94a3b8' },
+              { label: 'Eldiven', status: 'Sistem Bekleniyor', color: '#94a3b8' }
             ].map((item, index) => (
               <div key={index} style={{ padding: '15px', backgroundColor: '#0f172a', borderRadius: '10px', border: `1px solid ${item.color}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '14px', fontWeight: '500' }}>{item.label}</span>
@@ -118,7 +133,7 @@ export default function Dashboard({ role, onLogout }) {
 
         {/* Analiz Grafiği */}
         <div style={{ ...styles.card, gridColumn: 'span 12' }}>
-          <h3 style={styles.title}><Activity size={16}/> Canlı İvme & Risk Analizi</h3>
+          <h3 style={styles.title}><Activity size={16}/> {isYonetici ? 'Fabrika Genel Risk Analizi' : 'Canlı İvme & Risk Analizi'}</h3>
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={grafikVerisi}>
               <XAxis dataKey="zaman" stroke="#94a3b8" />
