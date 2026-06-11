@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 
 import {
   View,
@@ -14,7 +14,11 @@ import {
 
 import {useAuth} from '../../context/AuthContext';
 import {getDevices} from '../../services/api/deviceService';
-import {getUsers} from '../../services/api/authService';
+import {
+  getUsers,
+  makeUserAdmin,
+  makeUserWorker,
+} from '../../services/api/authService';
 import {sendSensorData} from '../../services/api/sensorService';
 import {getSensorPayload} from '../../services/sensors/sensorService';
 
@@ -26,38 +30,64 @@ const HomeScreen = ({navigation}: any) => {
   const [systemStatus] = useState('AKTİF');
   const [riskLevel, setRiskLevel] = useState('DÜŞÜK');
   const [activeDevice, setActiveDevice] = useState<any>(null);
+
   const [sending, setSending] = useState(false);
+  const [monitoring, setMonitoring] = useState(false);
+  const [lastSensorPayload, setLastSensorPayload] = useState<any>(null);
+  const [lastAlarmCount, setLastAlarmCount] = useState(0);
+  const [sensorError, setSensorError] = useState<string | null>(null);
+
+  const sendingRef = useRef(false);
 
   const [adminLoading, setAdminLoading] = useState(false);
   const [adminUsers, setAdminUsers] = useState<any[]>([]);
+  const [roleChangingUserId, setRoleChangingUserId] = useState<string | null>(
+    null,
+  );
   const [showAllUsers, setShowAllUsers] = useState(false);
 
-  const liveData = {
-    acceleration: 'Gerçek veri hazır',
-    location: 'BTÜ Kampüsü',
-    battery: 'Sensörden alınacak',
-    network: 'Aktif',
-    lastUpdate: activeDevice?.lastSeen
-      ? new Date(activeDevice.lastSeen).toLocaleString('tr-TR')
-      : 'Henüz veri yok',
-  };
-
-  const alerts = [
+  const [alerts, setAlerts] = useState<any[]>([
     {
-      id: 1,
+      id: 'system-ready',
       title: 'Sistem hazır',
       time: 'Canlı',
       level: 'Bilgi',
     },
-  ];
+  ]);
 
-  useEffect(() => {
-    fetchActiveDevice();
-
-    if (isAdmin) {
-      fetchAdminPanelData();
+  const formatSensorValue = (value: any) => {
+    if (value === null || value === undefined) {
+      return 'Veri bekleniyor';
     }
-  }, [token, isAdmin]);
+
+    if (typeof value === 'string' || typeof value === 'number') {
+      return String(value);
+    }
+
+    if (typeof value === 'object') {
+      if (
+        value.x !== undefined &&
+        value.y !== undefined &&
+        value.z !== undefined
+      ) {
+        return `x:${Number(value.x).toFixed(2)} y:${Number(value.y).toFixed(
+          2,
+        )} z:${Number(value.z).toFixed(2)}`;
+      }
+
+      return JSON.stringify(value);
+    }
+
+    return String(value);
+  };
+
+  const getUserId = (item: any) => {
+    return item?._id || item?.id;
+  };
+
+  const getCurrentUserId = () => {
+    return (user as any)?._id || (user as any)?.id;
+  };
 
   const normalizeUsersResponse = (response: any) => {
     if (Array.isArray(response)) {
@@ -71,8 +101,8 @@ const HomeScreen = ({navigation}: any) => {
     return [];
   };
 
-  const fetchAdminPanelData = async () => {
-    if (!token) return;
+  const fetchAdminPanelData = useCallback(async () => {
+    if (!token || !isAdmin) return;
 
     try {
       setAdminLoading(true);
@@ -86,106 +116,275 @@ const HomeScreen = ({navigation}: any) => {
     } finally {
       setAdminLoading(false);
     }
-  };
+  }, [token, isAdmin]);
 
-  const fetchActiveDevice = async () => {
+  const fetchActiveDevice = useCallback(async () => {
     if (!token) return;
 
-    const response = await getDevices(token);
+    try {
+      const response = await getDevices(token);
 
-    if (response.success) {
-      const device = response.devices?.find(
-        (item: any) => item.isActive,
-      );
+      if (response?.success) {
+        const devices = response.devices || [];
 
-      setActiveDevice(device || null);
+        const device =
+          devices.find((item: any) => item.isActive) || devices[0] || null;
+
+        setActiveDevice(device);
+      } else {
+        setActiveDevice(null);
+      }
+    } catch (error) {
+      console.log('ACTIVE DEVICE ERROR:', error);
+      setActiveDevice(null);
     }
-  };
+  }, [token]);
 
-  const handleSendSensorData = async () => {
+  useEffect(() => {
+    fetchActiveDevice();
+
+    if (isAdmin) {
+      fetchAdminPanelData();
+    }
+  }, [fetchActiveDevice, fetchAdminPanelData, isAdmin]);
+
+  const changeUserRole = async (
+    targetUserId: string,
+    newRole: 'admin' | 'worker',
+  ) => {
     if (!token) {
       Alert.alert('Hata', 'Token bulunamadı');
       return;
     }
 
-    if (!activeDevice) {
-      Alert.alert(
-        'Hata',
-        'Aktif cihaz bulunamadı. Önce cihaz kaydı oluşturulmalı.',
-      );
-      return;
-    }
-
     try {
-      setSending(true);
+      setRoleChangingUserId(targetUserId);
 
-      const payload = await getSensorPayload();
+      const response =
+        newRole === 'admin'
+          ? await makeUserAdmin(token, targetUserId)
+          : await makeUserWorker(token, targetUserId);
 
-      const response = await sendSensorData(token, {
-        deviceId: activeDevice._id,
-        ...payload,
-      });
-
-      if (response.success) {
-        if (response.alarms?.length > 0) {
-          setRiskLevel('YÜKSEK');
-        } else {
-          setRiskLevel('DÜŞÜK');
-        }
-
-        Alert.alert(
-          'Başarılı',
-          `Sensör verisi gönderildi. Alarm sayısı: ${
-            response.alarms?.length || 0
-          }`,
-        );
-
-        fetchActiveDevice();
-
-        if (isAdmin) {
-          fetchAdminPanelData();
-        }
-      } else {
-        Alert.alert(
-          'Hata',
-          response.message || 'Sensör verisi gönderilemedi',
-        );
+      if (response?.success === false) {
+        Alert.alert('Hata', response.message || 'Rol değiştirilemedi');
+        return;
       }
-    } catch (error: any) {
-      Alert.alert(
-        'Sensör Hatası',
-        error.message || 'Sensör verisi alınamadı',
+
+      setAdminUsers(previous =>
+        previous.map(item =>
+          getUserId(item) === targetUserId ? {...item, role: newRole} : item,
+        ),
       );
+
+      Alert.alert(
+        'Başarılı',
+        newRole === 'admin'
+          ? 'Kullanıcı admin yapıldı'
+          : 'Kullanıcı worker yapıldı',
+      );
+    } catch (error: any) {
+      Alert.alert('Hata', error?.message || 'Bağlantı hatası');
     } finally {
-      setSending(false);
+      setRoleChangingUserId(null);
     }
   };
 
-  const workerCount = adminUsers.filter(
-    item => item.role === 'worker',
-  ).length;
+  const handleChangeUserRole = (item: any) => {
+    const targetUserId = getUserId(item);
+    const currentUserId = getCurrentUserId();
 
-  const adminCount = adminUsers.filter(
-    item => item.role === 'admin',
-  ).length;
+    if (!targetUserId) {
+      Alert.alert('Hata', 'Kullanıcı ID bulunamadı');
+      return;
+    }
 
-  const visibleAdminUsers = showAllUsers
-    ? adminUsers
-    : adminUsers.slice(0, 2);
+    if (targetUserId === currentUserId) {
+      Alert.alert('Uyarı', 'Kendi hesabının rolünü değiştiremezsin.');
+      return;
+    }
 
-  const renderAdminStatCard = (
-    label: string,
-    value: string | number,
-  ) => {
+    const currentRole = item.role === 'admin' ? 'admin' : 'worker';
+    const newRole = currentRole === 'worker' ? 'admin' : 'worker';
+
+    Alert.alert(
+      'Rol Değiştir',
+      `${item.name || 'Bu kullanıcı'} ${
+        newRole === 'admin' ? 'admin' : 'worker'
+      } yapılacak. Emin misin?`,
+      [
+        {
+          text: 'Vazgeç',
+          style: 'cancel',
+        },
+        {
+          text: 'Onayla',
+          onPress: () => changeUserRole(targetUserId, newRole),
+        },
+      ],
+    );
+  };
+
+  const sendSensorSnapshot = useCallback(
+    async (showAlert = false) => {
+      if (!token) {
+        if (showAlert) {
+          Alert.alert('Hata', 'Token bulunamadı');
+        }
+        return;
+      }
+
+      if (!activeDevice) {
+        setMonitoring(false);
+
+        if (showAlert) {
+          Alert.alert(
+            'Hata',
+            'Aktif cihaz bulunamadı. Önce cihaz kaydı oluşturulmalı.',
+          );
+        }
+        return;
+      }
+
+      if (sendingRef.current) {
+        return;
+      }
+
+      try {
+        sendingRef.current = true;
+        setSending(true);
+        setSensorError(null);
+
+        const payload = await getSensorPayload();
+
+        setLastSensorPayload(payload);
+
+        const deviceMongoId = activeDevice._id || activeDevice.id;
+
+        const response = await sendSensorData(token, {
+          deviceId: deviceMongoId,
+          ...payload,
+        });
+
+        if (response?.success) {
+          const alarmCount = response.alarms?.length || 0;
+
+          setLastAlarmCount(alarmCount);
+
+          if (alarmCount > 0) {
+            setRiskLevel('YÜKSEK');
+
+            const newAlarmItems = response.alarms.map(
+              (alarm: any, index: number) => ({
+                id: alarm._id || alarm.id || `${Date.now()}-${index}`,
+                title:
+                  alarm.description ||
+                  alarm.title ||
+                  'Riskli sensör durumu algılandı',
+                time: new Date().toLocaleTimeString('tr-TR', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                }),
+                level: alarm.level || alarm.severity || 'Yüksek',
+              }),
+            );
+
+            setAlerts(previous => [...newAlarmItems, ...previous].slice(0, 5));
+          } else {
+            setRiskLevel('DÜŞÜK');
+          }
+
+          fetchActiveDevice();
+
+          if (showAlert) {
+            Alert.alert(
+              'Başarılı',
+              `Sensör verisi kontrol edildi. Alarm sayısı: ${alarmCount}`,
+            );
+          }
+        } else {
+          const message = response?.message || 'Sensör verisi gönderilemedi';
+
+          setSensorError(message);
+
+          if (showAlert) {
+            Alert.alert('Hata', message);
+          }
+        }
+      } catch (error: any) {
+        const message = error?.message || 'Sensör verisi alınamadı';
+
+        setSensorError(message);
+
+        if (showAlert) {
+          Alert.alert('Sensör Hatası', message);
+        }
+      } finally {
+        sendingRef.current = false;
+        setSending(false);
+      }
+    },
+    [token, activeDevice, fetchActiveDevice],
+  );
+
+  useEffect(() => {
+    if (!token || !activeDevice) {
+      setMonitoring(false);
+      return;
+    }
+
+    setMonitoring(true);
+
+    sendSensorSnapshot(false);
+
+    const intervalId: ReturnType<typeof setInterval> = setInterval(() => {
+      sendSensorSnapshot(false);
+    }, 10000);
+
+    return () => {
+      clearInterval(intervalId);
+      setMonitoring(false);
+    };
+  }, [token, activeDevice?._id, activeDevice?.id, sendSensorSnapshot]);
+
+  const accelerationValue =
+    lastSensorPayload?.acceleration ||
+    lastSensorPayload?.accelerometer ||
+    lastSensorPayload?.motion;
+
+  const locationValue =
+    lastSensorPayload?.location?.latitude &&
+    lastSensorPayload?.location?.longitude
+      ? `${lastSensorPayload.location.latitude}, ${lastSensorPayload.location.longitude}`
+      : 'Konum bekleniyor';
+
+  const batteryValue =
+    lastSensorPayload?.batteryLevel !== undefined
+      ? `%${lastSensorPayload.batteryLevel}`
+      : lastSensorPayload?.battery !== undefined
+      ? `%${lastSensorPayload.battery}`
+      : 'Veri bekleniyor';
+
+  const liveData = {
+    acceleration: formatSensorValue(accelerationValue),
+    location: locationValue,
+    battery: batteryValue,
+    network: monitoring ? 'Canlı izleme aktif' : 'İzleme beklemede',
+    lastUpdate: activeDevice?.lastSeen
+      ? new Date(activeDevice.lastSeen).toLocaleString('tr-TR')
+      : lastSensorPayload
+      ? new Date().toLocaleString('tr-TR')
+      : 'Henüz veri yok',
+  };
+
+  const workerCount = adminUsers.filter(item => item.role === 'worker').length;
+  const adminCount = adminUsers.filter(item => item.role === 'admin').length;
+  const visibleAdminUsers = showAllUsers ? adminUsers : adminUsers.slice(0, 2);
+
+  const renderAdminStatCard = (label: string, value: string | number) => {
     return (
       <View style={styles.adminStatCard}>
-        <Text style={styles.adminStatLabel}>
-          {label}
-        </Text>
-
-        <Text style={styles.adminStatValue}>
-          {value}
-        </Text>
+        <Text style={styles.adminStatLabel}>{label}</Text>
+        <Text style={styles.adminStatValue}>{value}</Text>
       </View>
     );
   };
@@ -197,9 +396,7 @@ const HomeScreen = ({navigation}: any) => {
       <View style={styles.adminPanel}>
         <View style={styles.adminPanelHeader}>
           <View>
-            <Text style={styles.adminPanelTitle}>
-              Yönetim Paneli
-            </Text>
+            <Text style={styles.adminPanelTitle}>Yönetim Paneli</Text>
 
             <Text style={styles.adminPanelSubTitle}>
               Admin hesabı — kullanıcı yönetimi
@@ -209,9 +406,7 @@ const HomeScreen = ({navigation}: any) => {
           <TouchableOpacity
             style={styles.refreshButton}
             onPress={fetchAdminPanelData}>
-            <Text style={styles.refreshButtonText}>
-              Yenile
-            </Text>
+            <Text style={styles.refreshButtonText}>Yenile</Text>
           </TouchableOpacity>
         </View>
 
@@ -224,26 +419,13 @@ const HomeScreen = ({navigation}: any) => {
         ) : (
           <>
             <View style={styles.adminGrid}>
-              {renderAdminStatCard(
-                'Toplam Kullanıcı',
-                adminUsers.length,
-              )}
-
-              {renderAdminStatCard(
-                'Worker',
-                workerCount,
-              )}
-
-              {renderAdminStatCard(
-                'Admin',
-                adminCount,
-              )}
+              {renderAdminStatCard('Toplam Kullanıcı', adminUsers.length)}
+              {renderAdminStatCard('Worker', workerCount)}
+              {renderAdminStatCard('Admin', adminCount)}
             </View>
 
             <View style={styles.adminUsersHeader}>
-              <Text style={styles.adminSectionTitle}>
-                Kullanıcılar
-              </Text>
+              <Text style={styles.adminSectionTitle}>Kullanıcılar</Text>
 
               <Text style={styles.adminUserCountText}>
                 {adminUsers.length} kişi
@@ -251,49 +433,93 @@ const HomeScreen = ({navigation}: any) => {
             </View>
 
             {adminUsers.length === 0 ? (
-              <Text style={styles.adminEmptyText}>
-                Kullanıcı bulunamadı.
-              </Text>
+              <Text style={styles.adminEmptyText}>Kullanıcı bulunamadı.</Text>
             ) : (
-              visibleAdminUsers.map((item, index) => (
-                <View
-                  key={item._id || item.id || index}
-                  style={styles.adminListCard}>
-                  <View style={styles.adminListLeft}>
-                    <View style={styles.avatarCircle}>
-                      <Text style={styles.avatarText}>
-                        {(item.name || '?').charAt(0).toUpperCase()}
-                      </Text>
+              visibleAdminUsers.map((item, index) => {
+                const itemId = getUserId(item);
+                const currentUserId = getCurrentUserId();
+                const itemRole = item.role === 'admin' ? 'admin' : 'worker';
+                const nextRole = itemRole === 'worker' ? 'admin' : 'worker';
+                const isCurrentUser = itemId === currentUserId;
+                const isChanging = roleChangingUserId === itemId;
+
+                return (
+                  <View key={itemId || index} style={styles.adminListCard}>
+                    <View style={styles.adminListLeft}>
+                      <View
+                        style={[
+                          styles.avatarCircle,
+                          itemRole === 'admin' && styles.adminAvatarCircle,
+                        ]}>
+                        <Text
+                          style={[
+                            styles.avatarText,
+                            itemRole === 'admin' && styles.adminAvatarText,
+                          ]}>
+                          {(item.name || '?').charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+
+                      <View style={styles.adminListInfo}>
+                        <Text style={styles.adminListTitle}>
+                          {item.name || 'İsimsiz Kullanıcı'}
+                        </Text>
+
+                        <Text style={styles.adminListSubText}>
+                          {item.email || 'E-posta yok'}
+                        </Text>
+
+                        <Text style={styles.adminListSubText}>
+                          Departman: {item.department || 'Genel'}
+                        </Text>
+                      </View>
                     </View>
 
-                    <View style={styles.adminListInfo}>
-                      <Text style={styles.adminListTitle}>
-                        {item.name || 'İsimsiz Kullanıcı'}
-                      </Text>
+                    <View style={styles.adminListRight}>
+                      <View
+                        style={[
+                          styles.roleBadge,
+                          itemRole === 'admin'
+                            ? styles.adminRoleBadge
+                            : styles.workerRoleBadge,
+                        ]}>
+                        <Text style={styles.roleBadgeText}>{itemRole}</Text>
+                      </View>
 
-                      <Text style={styles.adminListSubText}>
-                        {item.email || 'E-posta yok'}
-                      </Text>
+                      {!isCurrentUser && (
+                        <TouchableOpacity
+                          style={[
+                            styles.roleActionButton,
+                            nextRole === 'admin'
+                              ? styles.makeAdminButton
+                              : styles.makeWorkerButton,
+                            isChanging && styles.roleActionButtonDisabled,
+                          ]}
+                          disabled={isChanging}
+                          onPress={() => handleChangeUserRole(item)}>
+                          <Text
+                            style={[
+                              styles.roleActionButtonText,
+                              nextRole === 'admin'
+                                ? styles.makeAdminButtonText
+                                : styles.makeWorkerButtonText,
+                            ]}>
+                            {isChanging
+                              ? '...'
+                              : nextRole === 'admin'
+                              ? 'Admin Yap'
+                              : 'Worker Yap'}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
 
-                      <Text style={styles.adminListSubText}>
-                        Departman: {item.department || 'Genel'}
-                      </Text>
+                      {isCurrentUser && (
+                        <Text style={styles.currentUserText}>Sen</Text>
+                      )}
                     </View>
                   </View>
-
-                  <View
-                    style={[
-                      styles.roleBadge,
-                      item.role === 'admin'
-                        ? styles.adminRoleBadge
-                        : styles.workerRoleBadge,
-                    ]}>
-                    <Text style={styles.roleBadgeText}>
-                      {item.role || 'worker'}
-                    </Text>
-                  </View>
-                </View>
-              ))
+                );
+              })
             )}
 
             {adminUsers.length > 2 && (
@@ -315,66 +541,49 @@ const HomeScreen = ({navigation}: any) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar
-        backgroundColor="#0F172A"
-        barStyle="light-content"
-      />
+      <StatusBar backgroundColor="#0F172A" barStyle="light-content" />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContainer}>
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <Text style={styles.welcomeText}>
-              Mobil Güvenlik Platformu
-            </Text>
+            <Text style={styles.welcomeText}>Mobil Güvenlik Platformu</Text>
 
-            <Text style={styles.subTitle}>
-              Gerçek zamanlı izleme sistemi
-            </Text>
+            <Text style={styles.subTitle}>Gerçek zamanlı izleme sistemi</Text>
 
             <Text style={styles.userText}>
               Hoş geldin {user?.name || 'Kullanıcı'}
             </Text>
 
             {isAdmin && (
-              <Text style={styles.adminModeText}>
-                Yönetici Görünümü
-              </Text>
+              <Text style={styles.adminModeText}>Yönetici Görünümü</Text>
             )}
           </View>
 
           <View style={styles.statusBadge}>
-            <Text style={styles.statusText}>
-              {systemStatus}
-            </Text>
+            <Text style={styles.statusText}>{systemStatus}</Text>
           </View>
         </View>
 
         {renderAdminPanel()}
 
         <View style={styles.deviceCard}>
-          <Text style={styles.cardTitle}>
-            Aktif Cihaz
-          </Text>
+          <Text style={styles.cardTitle}>Aktif Cihaz</Text>
 
           <Text style={styles.deviceName}>
-            {activeDevice
-              ? activeDevice.name
-              : 'Aktif cihaz bulunamadı'}
+            {activeDevice ? activeDevice.name : 'Aktif cihaz bulunamadı'}
           </Text>
 
           {activeDevice && (
             <Text style={styles.deviceSubText}>
-              Cihaz Kodu: {activeDevice.deviceId}
+              Cihaz Kodu: {activeDevice.deviceId || activeDevice._id}
             </Text>
           )}
         </View>
 
         <View style={styles.riskCard}>
-          <Text style={styles.cardTitle}>
-            Güncel Risk Durumu
-          </Text>
+          <Text style={styles.cardTitle}>Güncel Risk Durumu</Text>
 
           <Text
             style={[
@@ -385,133 +594,111 @@ const HomeScreen = ({navigation}: any) => {
           </Text>
 
           <Text style={styles.cardSubText}>
-            Son gönderilen sensör verisine göre
+            {monitoring
+              ? `Otomatik izleme aktif. Son alarm sayısı: ${lastAlarmCount}`
+              : 'Sensör izleme başlatılıyor'}
           </Text>
+
+          {sensorError && <Text style={styles.errorText}>{sensorError}</Text>}
         </View>
 
-        <Text style={styles.sectionTitle}>
-          Canlı Sensör Verileri
-        </Text>
+        <Text style={styles.sectionTitle}>Canlı Sensör Verileri</Text>
 
         <View style={styles.dataGrid}>
           <View style={styles.dataCard}>
-            <Text style={styles.dataLabel}>
-              İvme
-            </Text>
-
-            <Text style={styles.dataValue}>
-              {liveData.acceleration}
-            </Text>
+            <Text style={styles.dataLabel}>İvme</Text>
+            <Text style={styles.dataValue}>{liveData.acceleration}</Text>
           </View>
 
           <View style={styles.dataCard}>
-            <Text style={styles.dataLabel}>
-              Batarya
-            </Text>
-
-            <Text style={styles.dataValue}>
-              {liveData.battery}
-            </Text>
+            <Text style={styles.dataLabel}>Batarya</Text>
+            <Text style={styles.dataValue}>{liveData.battery}</Text>
           </View>
 
           <View style={styles.dataCard}>
-            <Text style={styles.dataLabel}>
-              Ağ
-            </Text>
-
-            <Text style={styles.dataValue}>
-              {liveData.network}
-            </Text>
+            <Text style={styles.dataLabel}>Ağ</Text>
+            <Text style={styles.dataValue}>{liveData.network}</Text>
           </View>
 
           <View style={styles.dataCard}>
-            <Text style={styles.dataLabel}>
-              Güncelleme
-            </Text>
-
-            <Text style={styles.dataValueSmall}>
-              {liveData.lastUpdate}
-            </Text>
+            <Text style={styles.dataLabel}>Güncelleme</Text>
+            <Text style={styles.dataValueSmall}>{liveData.lastUpdate}</Text>
           </View>
         </View>
 
         <View style={styles.locationCard}>
-          <Text style={styles.cardTitle}>
-            Son Konum
-          </Text>
-
-          <Text style={styles.locationText}>
-            {liveData.location}
-          </Text>
+          <Text style={styles.cardTitle}>Son Konum</Text>
+          <Text style={styles.locationText}>{liveData.location}</Text>
         </View>
 
         <View style={styles.alertHeader}>
-          <Text style={styles.sectionTitle}>
-            Son Alarm Kayıtları
-          </Text>
+          <Text style={styles.sectionTitle}>Son Alarm Kayıtları</Text>
 
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Alarmlar')}>
-            <Text style={styles.viewAllText}>
-              Tümünü Gör
-            </Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Alarmlar')}>
+            <Text style={styles.viewAllText}>Tümünü Gör</Text>
           </TouchableOpacity>
         </View>
 
         {alerts.map(item => (
-          <View
-            key={item.id}
-            style={styles.alertCard}>
-            <View>
-              <Text style={styles.alertTitle}>
-                {item.title}
-              </Text>
-
-              <Text style={styles.alertTime}>
-                {item.time}
-              </Text>
+          <View key={item.id} style={styles.alertCard}>
+            <View style={styles.alertContent}>
+              <Text style={styles.alertTitle}>{item.title}</Text>
+              <Text style={styles.alertTime}>{item.time}</Text>
             </View>
 
             <View style={styles.alertBadge}>
-              <Text style={styles.alertBadgeText}>
-                {item.level}
-              </Text>
+              <Text style={styles.alertBadgeText}>{item.level}</Text>
             </View>
           </View>
         ))}
 
-        <Text style={styles.sectionTitle}>
-          Hızlı İşlemler
-        </Text>
+        <Text style={styles.sectionTitle}>Hızlı İşlemler</Text>
 
         <View style={styles.actionContainer}>
           <TouchableOpacity
             style={styles.actionButton}
             onPress={() => navigation.navigate('Dashboard')}>
-            <Text style={styles.actionButtonText}>
-              Analiz
-            </Text>
+            <Text style={styles.actionButtonText}>Analiz</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.actionButton}
             onPress={() => navigation.navigate('Cihazlar')}>
-            <Text style={styles.actionButtonText}>
-              Cihazlar
-            </Text>
+            <Text style={styles.actionButtonText}>Cihazlar</Text>
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity
-          style={styles.sensorButton}
-          onPress={handleSendSensorData}
-          disabled={sending}>
-          <Text style={styles.actionButtonText}>
-            {sending
-              ? 'Gönderiliyor...'
-              : 'Sensör Verisi Gönder'}
+        <View style={styles.monitoringCard}>
+          <Text style={styles.monitoringTitle}>Sensör İzleme Durumu</Text>
+
+          <Text
+            style={[
+              styles.monitoringStatus,
+              monitoring ? styles.monitoringActive : styles.monitoringPassive,
+            ]}>
+            {monitoring ? 'OTOMATİK İZLEME AKTİF' : 'İZLEME BEKLEMEDE'}
           </Text>
-        </TouchableOpacity>
+
+          <Text style={styles.monitoringDesc}>
+            Sensör verileri belirli aralıklarla otomatik alınır. Olumsuz durum
+            algılanırsa backend alarm oluşturur.
+          </Text>
+
+          {sending && (
+            <Text style={styles.monitoringSending}>
+              Sensör verisi kontrol ediliyor...
+            </Text>
+          )}
+
+          <TouchableOpacity
+            style={styles.manualCheckButton}
+            onPress={() => sendSensorSnapshot(true)}
+            disabled={sending}>
+            <Text style={styles.manualCheckButtonText}>
+              {sending ? 'Kontrol ediliyor...' : 'Manuel Kontrol Et'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -713,6 +900,16 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
+  adminAvatarCircle: {
+    backgroundColor: '#78350F',
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+
+  adminAvatarText: {
+    color: '#F59E0B',
+  },
+
   adminListInfo: {
     flex: 1,
   },
@@ -727,6 +924,11 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     marginTop: 4,
     fontSize: 12,
+  },
+
+  adminListRight: {
+    alignItems: 'flex-end',
+    gap: 8,
   },
 
   roleBadge: {
@@ -747,6 +949,46 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: '700',
     fontSize: 10,
+  },
+
+  roleActionButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+
+  makeAdminButton: {
+    backgroundColor: '#451A03',
+    borderColor: '#F59E0B',
+  },
+
+  makeWorkerButton: {
+    backgroundColor: '#450A0A',
+    borderColor: '#EF4444',
+  },
+
+  roleActionButtonDisabled: {
+    opacity: 0.5,
+  },
+
+  roleActionButtonText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+
+  makeAdminButtonText: {
+    color: '#F59E0B',
+  },
+
+  makeWorkerButtonText: {
+    color: '#FCA5A5',
+  },
+
+  currentUserText: {
+    color: '#64748B',
+    fontSize: 11,
+    fontWeight: '700',
   },
 
   adminViewAllButton: {
@@ -811,6 +1053,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
+  errorText: {
+    color: '#FCA5A5',
+    marginTop: 8,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
   sectionTitle: {
     color: 'white',
     fontSize: 20,
@@ -842,7 +1091,7 @@ const styles = StyleSheet.create({
 
   dataValue: {
     color: 'white',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
   },
 
@@ -884,6 +1133,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 12,
+  },
+
+  alertContent: {
+    flex: 1,
   },
 
   alertTitle: {
@@ -924,17 +1178,68 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  sensorButton: {
-    backgroundColor: '#16A34A',
-    paddingVertical: 16,
-    borderRadius: 16,
-    marginTop: 16,
-    alignItems: 'center',
-  },
-
   actionButtonText: {
     color: 'white',
     fontWeight: 'bold',
     fontSize: 15,
+  },
+
+  monitoringCard: {
+    backgroundColor: '#1E293B',
+    borderRadius: 18,
+    padding: 18,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+
+  monitoringTitle: {
+    color: '#CBD5E1',
+    fontSize: 15,
+    marginBottom: 10,
+    fontWeight: '700',
+  },
+
+  monitoringStatus: {
+    fontSize: 18,
+    fontWeight: '900',
+    marginBottom: 8,
+  },
+
+  monitoringActive: {
+    color: '#22C55E',
+  },
+
+  monitoringPassive: {
+    color: '#F59E0B',
+  },
+
+  monitoringDesc: {
+    color: '#94A3B8',
+    lineHeight: 20,
+    fontSize: 13,
+  },
+
+  monitoringSending: {
+    color: '#38BDF8',
+    marginTop: 10,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  manualCheckButton: {
+    backgroundColor: '#0F172A',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+
+  manualCheckButtonText: {
+    color: '#CBD5E1',
+    fontWeight: '800',
+    fontSize: 13,
   },
 });
