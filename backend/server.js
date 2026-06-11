@@ -524,6 +524,7 @@ const io = new Server(server, {
 });
 
 app.use(express.json());
+app.use('/api/auth', require('./src/routes/auth'));
 
 // MongoDB bağlantısı
 mongoose.connect(process.env.MONGO_URI)
@@ -578,7 +579,6 @@ app.post('/register',
         return res.status(400).json({ message: "Email zaten kayıtlı" });
       }
       const hashedPassword = await bcrypt.hash(password, 10);
-      // role gönderilse bile yok sayılır, model default'u "worker" kullanır
       const user = new User({ name: fullName, email, password: hashedPassword });
       await user.save();
       res.json({ message: "Kayıt başarılı" });
@@ -588,8 +588,6 @@ app.post('/register',
 });
 
 /* LOGIN */
-// server.js'de sadece LOGIN endpoint'ini şununla değiştir:
-
 app.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -599,16 +597,16 @@ app.post('/login', async (req, res) => {
     if (!isMatch) return res.status(400).json({ message: "Şifre hatalı" });
     const secret = process.env.JWT_SECRET || 'isg_super_gizli_anahtar_2024';
     const token = jwt.sign(
-      { userId: user._id, role: user.role },  // role token'a gömülüyor
+      { userId: user._id, role: user.role },
       secret,
       { expiresIn: "1d" }
     );
     res.json({
       message: "Giriş başarılı",
       token,
-      role: user.role,       // frontend role kontrolü için
-      userId: user._id,      // frontend userId için
-      name: user.name        // frontend isim için
+      role: user.role,
+      userId: user._id,
+      name: user.name
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -625,7 +623,7 @@ app.get('/users', authMiddleware, adminOnly, async (req, res) => {
   }
 });
 
-/* KULLANICIYA ADMİN YETKİSİ VER — sadece admin yapabilir */
+/* KULLANICIYA ADMİN YETKİSİ VER */
 app.put('/users/:id/make-admin', authMiddleware, adminOnly, async (req, res) => {
   try {
     const user = await User.findByIdAndUpdate(
@@ -634,13 +632,13 @@ app.put('/users/:id/make-admin', authMiddleware, adminOnly, async (req, res) => 
       { new: true }
     ).select('-password');
     if (!user) return res.status(404).json({ message: 'Kullanıcı bulunamadı' });
-    res.json({ message: `${user.fullName} artık admin`, user });
+    res.json({ message: `${user.name} artık admin`, user });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-/* KULLANICIDAN ADMİN YETKİSİ AL — sadece admin yapabilir */
+/* KULLANICIDAN ADMİN YETKİSİ AL */
 app.put('/users/:id/make-worker', authMiddleware, adminOnly, async (req, res) => {
   try {
     const user = await User.findByIdAndUpdate(
@@ -649,7 +647,7 @@ app.put('/users/:id/make-worker', authMiddleware, adminOnly, async (req, res) =>
       { new: true }
     ).select('-password');
     if (!user) return res.status(404).json({ message: 'Kullanıcı bulunamadı' });
-    res.json({ message: `${user.fullName} artık worker`, user });
+    res.json({ message: `${user.name} artık worker`, user });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -669,7 +667,7 @@ app.post('/risk', authMiddleware, async (req, res) => {
 /* RISK LİSTELE */
 app.get('/risk', authMiddleware, async (req, res) => {
   try {
-    const risks = await Risk.find().populate('userId', 'fullName email');
+    const risks = await Risk.find().populate('userId', 'name email');
     res.json(risks);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -695,9 +693,28 @@ app.post('/alert', authMiddleware, async (req, res) => {
 app.get('/alert', authMiddleware, async (req, res) => {
   try {
     const alerts = await Alert.find()
-      .populate('userId', 'fullName email')
+      .populate('userId', 'name email')
       .sort({ createdAt: -1 });
     res.json(alerts);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ALARM ÇÖZDÜ */
+app.put('/alert/:id/resolve', authMiddleware, async (req, res) => {
+  try {
+    const alert = await Alert.findByIdAndUpdate(
+      req.params.id,
+      {
+        resolved: true,
+        resolvedAt: new Date(),
+        resolvedBy: req.user.userId
+      },
+      { new: true }
+    );
+    if (!alert) return res.status(404).json({ message: 'Alarm bulunamadı' });
+    res.json({ success: true, alert });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -717,8 +734,18 @@ app.post('/report', authMiddleware, async (req, res) => {
 /* REPORT LİSTELE */
 app.get('/report', authMiddleware, async (req, res) => {
   try {
-    const reports = await Report.find().populate('createdBy', 'fullName email');
+    const reports = await Report.find().populate('createdBy', 'name email');
     res.json(reports);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* CİHAZ LİSTELE */
+app.get('/devices', authMiddleware, async (req, res) => { 
+  try {
+    const devices = await Device.find().populate('assignedUser', 'name email');
+    res.json(devices);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -802,7 +829,7 @@ app.get('/sensor/analyze', authMiddleware, async (req, res) => {
 /* SENSOR - TÜM VERİLER */
 app.get('/sensor', authMiddleware, async (req, res) => {
   try {
-    const data = await SensorData.find().populate('userId', 'fullName email');
+    const data = await SensorData.find().populate('userId', 'name email');
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: err.message });

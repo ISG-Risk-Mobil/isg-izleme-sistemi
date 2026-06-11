@@ -74,6 +74,7 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
+const Device = require('../models/Device');
 const { protect } = require('../middleware/auth');
 
 // role'ü de token'a göm
@@ -96,23 +97,18 @@ const adminOnly = (req, res, next) => {
 router.post('/register', async (req, res) => {
   try {
     const { name, email, password, department } = req.body;
-    // role body'den alınmıyor — herkes worker olarak kayıt olur
-
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ success: false, message: 'Bu email zaten kayıtlı' });
     }
-
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
-
     const user = await User.create({
       name, email,
       password: hashedPassword,
       role: 'worker',
       department
     });
-
     const token = generateToken(user._id, user.role);
     res.status(201).json({
       success: true, token,
@@ -137,8 +133,6 @@ router.post('/login', async (req, res) => {
     if (!isMatch) {
       return res.status(401).json({ success: false, message: 'Geçersiz email veya şifre' });
     }
-
-    // Rol DB'den okunuyor — token'a gömülüyor
     const token = generateToken(user._id, user.role);
     res.json({
       success: true, token,
@@ -188,20 +182,6 @@ router.put('/users/:id/make-worker', protect, adminOnly, async (req, res) => {
     ).select('-password');
     if (!user) return res.status(404).json({ success: false, message: 'Kullanıcı bulunamadı' });
     res.json({ success: true, message: `${user.name} artık worker`, user });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-router.put('/users/:id/make-admin', protect, adminOnly, async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id);
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'Kullanıcı bulunamadı' });
-    }
-    user.role = 'admin';
-    await user.save();
-    res.json({ success: true, message: 'Kullanıcı admin yapıldı', user: { id: user._id, name: user.name, email: user.email, role: user.role } });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -266,6 +246,16 @@ router.put('/change-password', protect, async (req, res) => {
     user.password = await bcrypt.hash(newPassword, salt);
     await user.save();
     res.json({ success: true, message: 'Şifre güncellendi' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Cihaz listesi
+router.get('/devices', protect, async (req, res) => {
+  try {
+    const devices = await Device.find().populate('assignedUser', 'name email');
+    res.json({ success: true, devices });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

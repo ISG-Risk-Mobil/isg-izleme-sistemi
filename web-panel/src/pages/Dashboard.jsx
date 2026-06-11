@@ -22,7 +22,8 @@ export default function Dashboard({ role, onLogout, onBack }) {
   const [aktifSekme, setAktifSekme] = useState('anaDashboard');
   const [kullaniciListesi, setKullaniciListesi] = useState([]);
   const [kullaniciYukleniyor, setKullaniciYukleniyor] = useState(false);
-  const [rolDegistiriliyor, setRolDegistiriliyor] = useState(null); // hangi kullanıcının rolü değişiyor
+  const [rolDegistiriliyor, setRolDegistiriliyor] = useState(null);
+  const [cihazlar, setCihazlar] = useState([]);
 
   const kullaniciRolu = getRoleFromToken();
   const mevcutKullaniciId = localStorage.getItem('userId');
@@ -54,12 +55,11 @@ export default function Dashboard({ role, onLogout, onBack }) {
     })
   };
 
-  // Kullanıcı listesini çek
   const fetchKullanicilar = async () => {
     if (!isAdmin) return;
     setKullaniciYukleniyor(true);
     try {
-      const res = await fetch('http://localhost:5000/users', {
+      const res = await fetch('http://localhost:5000/api/auth/users', {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await res.json();
@@ -72,26 +72,49 @@ export default function Dashboard({ role, onLogout, onBack }) {
     }
   };
 
+  const fetchAlarmlar = async () => {
+    try {
+      const res = await fetch('http://localhost:5000/alert', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      const data = await res.json();
+      if (Array.isArray(data)) setAlarmlar(data.slice(0, 5));
+    } catch (err) {
+      console.error('Alarmlar çekilemedi:', err);
+    }
+  };
+
+  const fetchCihazlar = async () => {
+    try {
+      const res = await fetch('http://localhost:5000/api/auth/devices', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      const data = await res.json();
+      if (data.success) setCihazlar(data.devices);
+      else if (Array.isArray(data)) setCihazlar(data);
+    } catch (err) {
+      console.error('Cihazlar çekilemedi:', err);
+    }
+  };
+
   useEffect(() => {
     fetchKullanicilar();
+    fetchAlarmlar();
+    fetchCihazlar();
   }, [isAdmin]);
 
-  // Rol değiştir — admin yap veya worker yap
   const rolDegistir = async (kullaniciId, yeniRol) => {
     setRolDegistiriliyor(kullaniciId);
     try {
       const endpoint = yeniRol === 'admin'
         ? `http://localhost:5000/api/auth/users/${kullaniciId}/make-admin`
         : `http://localhost:5000/api/auth/users/${kullaniciId}/make-worker`;
-
       const res = await fetch(endpoint, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await res.json();
-
       if (res.ok) {
-        // Listeyi güncelle — sayfayı yeniden yüklemeden
         setKullaniciListesi(onceki =>
           onceki.map(u => u._id === kullaniciId ? { ...u, role: yeniRol } : u)
         );
@@ -108,14 +131,11 @@ export default function Dashboard({ role, onLogout, onBack }) {
   useEffect(() => {
     const soket = io('http://localhost:5000');
     soket.on('sensorData', (yeniVeri) => {
-  const risk = yeniVeri.lastSensorValue || 0;
-  setGrafikVerisi(onceki => [...onceki.slice(-19), {
-    zaman: new Date().toLocaleTimeString().slice(0, 5),
-    risk
-  }]);
-});
-    soket.on('new-alarm', (yeniAlarm) => {
-      setAlarmlar(onceki => [yeniAlarm, ...onceki].slice(0, 5));
+      const risk = yeniVeri.lastSensorValue || 0;
+      setGrafikVerisi(onceki => [...onceki.slice(-19), {
+        zaman: new Date().toLocaleTimeString().slice(0, 5),
+        risk
+      }]);
     });
     soket.on('newUser', (yeniKullanici) => {
       setKullaniciListesi(onceki => [yeniKullanici, ...onceki]);
@@ -140,8 +160,8 @@ export default function Dashboard({ role, onLogout, onBack }) {
       <div style={{ ...styles.card, gridColumn: 'span 4' }}>
         <p style={styles.title}><AlertTriangle size={14}/> Aktif Alarmlar</p>
         <div style={styles.statKart('#ef4444')}>
-          <span style={{ fontSize: '32px', fontWeight: '700', color: '#ef4444' }}>{alarmlar.length}</span>
-          <span style={{ fontSize: '12px', color: '#64748b' }}>Son 5 alarm</span>
+          <span style={{ fontSize: '32px', fontWeight: '700', color: '#ef4444' }}>{alarmlar.filter(a => !a.resolved).length}</span>
+          <span style={{ fontSize: '12px', color: '#64748b' }}>Çözülmemiş alarm</span>
         </div>
       </div>
       <div style={{ ...styles.card, gridColumn: 'span 4' }}>
@@ -167,8 +187,8 @@ export default function Dashboard({ role, onLogout, onBack }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {alarmlar.length === 0 ? <p style={{ color: '#64748b', fontSize: '13px', margin: 0 }}>Aktif alarm yok.</p>
             : alarmlar.map((a, i) => (
-              <div key={i} style={{ padding: '10px 12px', backgroundColor: '#0f172a', borderRadius: '8px', fontSize: '13px', borderLeft: '3px solid #ef4444', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: '#cbd5e1' }}>{a.description}</span>
+              <div key={a._id || i} style={{ padding: '10px 12px', backgroundColor: '#0f172a', borderRadius: '8px', fontSize: '13px', borderLeft: `3px solid ${a.resolved ? '#22c55e' : '#ef4444'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#cbd5e1' }}>{a.message}</span>
                 <ChevronRight size={14} color="#64748b"/>
               </div>
             ))}
@@ -241,8 +261,6 @@ export default function Dashboard({ role, onLogout, onBack }) {
       <div style={{ ...styles.card, gridColumn: 'span 12', border: '1px solid #f59e0b', background: 'linear-gradient(135deg, #1e293b 0%, #1a2535 100%)' }}>
         <p style={{ ...styles.title, color: '#f59e0b', marginBottom: 0 }}><Users size={14}/> Yönetici Kontrol Paneli — Tüm fabrika sahası izleniyor</p>
       </div>
-
-      {/* Kullanıcı listesi — gerçek veri + rol değiştirme */}
       <div style={{ ...styles.card, gridColumn: 'span 8' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
           <p style={{ ...styles.title, marginBottom: 0 }}><Users size={14}/> Kullanıcılar</p>
@@ -266,7 +284,6 @@ export default function Dashboard({ role, onLogout, onBack }) {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={styles.badge(u.role === 'admin' ? '#f59e0b' : '#22c55e')}>{u.role}</span>
-                {/* Kendi hesabına rol değiştiremez */}
                 {u._id !== mevcutKullaniciId && (
                   <button
                     style={styles.rolBtn(u.role === 'worker' ? 'admin' : 'worker')}
@@ -284,22 +301,20 @@ export default function Dashboard({ role, onLogout, onBack }) {
           ))}
         </div>
       </div>
-
-      {/* Cihaz yönetimi */}
       <div style={{ ...styles.card, gridColumn: 'span 4' }}>
         <p style={styles.title}><Cpu size={14}/> Cihaz Yönetimi</p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {[
-            { id: 'DEV-001', tip: 'Kamera', durum: 'Çevrimiçi', renk: '#22c55e' },
-            { id: 'DEV-002', tip: 'Sensör', durum: 'Çevrimiçi', renk: '#22c55e' },
-            { id: 'DEV-003', tip: 'Kamera', durum: 'Çevrimdışı', renk: '#ef4444' },
-          ].map((d, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', backgroundColor: '#0f172a', borderRadius: '10px', border: `1px solid ${d.renk}20` }}>
+          {cihazlar.length === 0 ? (
+            <p style={{ color: '#64748b', fontSize: '13px', textAlign: 'center', padding: '20px' }}>Cihaz bulunamadı.</p>
+          ) : cihazlar.map((d) => (
+            <div key={d._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', backgroundColor: '#0f172a', borderRadius: '10px', border: `1px solid ${d.isActive ? '#22c55e' : '#ef4444'}20` }}>
               <div>
-                <p style={{ margin: 0, fontSize: '13px', fontWeight: '600', color: '#cbd5e1' }}>{d.id}</p>
-                <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>{d.tip}</p>
+                <p style={{ margin: 0, fontSize: '13px', fontWeight: '600', color: '#cbd5e1' }}>{d.deviceId}</p>
+                <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>{d.name} · {d.assignedUser?.name || 'Atanmamış'}</p>
               </div>
-              <span style={styles.badge(d.renk)}>{d.durum}</span>
+              <span style={styles.badge(d.isActive ? '#22c55e' : '#ef4444')}>
+                {d.isActive ? 'Çevrimiçi' : 'Çevrimdışı'}
+              </span>
             </div>
           ))}
         </div>
@@ -368,3 +383,5 @@ export default function Dashboard({ role, onLogout, onBack }) {
     </div>
   );
 }
+
+
