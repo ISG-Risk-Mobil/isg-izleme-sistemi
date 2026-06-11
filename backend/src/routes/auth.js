@@ -207,4 +207,68 @@ router.put('/users/:id/make-admin', protect, adminOnly, async (req, res) => {
   }
 });
 
+// Şifremi Unuttum
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Bu email kayıtlı değil' });
+    }
+    const resetToken = jwt.sign(
+      { id: user._id },
+      process.env.JWT_SECRET,
+      { expiresIn: '15m' }
+    );
+    res.json({ success: true, resetToken });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Şifre Sıfırla
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { resetToken, newPassword } = req.body;
+    if (!resetToken || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Token ve yeni şifre zorunludur' });
+    }
+    const decoded = jwt.verify(resetToken, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Kullanıcı bulunamadı' });
+    }
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    await user.save();
+    res.json({ success: true, message: 'Şifre sıfırlandı' });
+  } catch (err) {
+    if (err.name === 'TokenExpiredError') {
+      return res.status(400).json({ success: false, message: 'Token süresi doldu' });
+    }
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Şifre Değiştir
+router.put('/change-password', protect, async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+    if (!oldPassword || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Eski ve yeni şifre zorunludur' });
+    }
+    const user = await User.findById(req.user._id);
+    const isMatch = await bcrypt.compare(oldPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ success: false, message: 'Eski şifre hatalı' });
+    }
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    await user.save();
+    res.json({ success: true, message: 'Şifre güncellendi' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 module.exports = router;
