@@ -59,12 +59,11 @@ export default function Dashboard({ role, onLogout, onBack }) {
     if (!isAdmin) return;
     setKullaniciYukleniyor(true);
     try {
-      const res = await fetch('http://localhost:5000/api/auth/users', {
+      const res = await fetch('http://localhost:5000/users', {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await res.json();
-      if (data.success) setKullaniciListesi(data.users);
-      else if (Array.isArray(data)) setKullaniciListesi(data);
+      if (Array.isArray(data)) setKullaniciListesi(data);
     } catch (err) {
       console.error('Kullanıcılar çekilemedi:', err);
     } finally {
@@ -81,8 +80,8 @@ export default function Dashboard({ role, onLogout, onBack }) {
     setRolDegistiriliyor(kullaniciId);
     try {
       const endpoint = yeniRol === 'admin'
-        ? `http://localhost:5000/api/auth/users/${kullaniciId}/make-admin`
-        : `http://localhost:5000/api/auth/users/${kullaniciId}/make-worker`;
+        ? `http://localhost:5000/users/${kullaniciId}/make-admin`
+        : `http://localhost:5000/users/${kullaniciId}/make-worker`;
 
       const res = await fetch(endpoint, {
         method: 'PUT',

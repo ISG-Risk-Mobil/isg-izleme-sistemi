@@ -588,6 +588,8 @@ app.post('/register',
 });
 
 /* LOGIN */
+// server.js'de sadece LOGIN endpoint'ini şununla değiştir:
+
 app.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -597,11 +599,17 @@ app.post('/login', async (req, res) => {
     if (!isMatch) return res.status(400).json({ message: "Şifre hatalı" });
     const secret = process.env.JWT_SECRET || 'isg_super_gizli_anahtar_2024';
     const token = jwt.sign(
-      { userId: user._id, role: user.role },
+      { userId: user._id, role: user.role },  // role token'a gömülüyor
       secret,
       { expiresIn: "1d" }
     );
-    res.json({ message: "Giriş başarılı", token, role: user.role });
+    res.json({
+      message: "Giriş başarılı",
+      token,
+      role: user.role,       // frontend role kontrolü için
+      userId: user._id,      // frontend userId için
+      name: user.name        // frontend isim için
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

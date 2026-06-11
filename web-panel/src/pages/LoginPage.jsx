@@ -17,7 +17,7 @@ function LoginPage({ baslangicKayitMi, onLogin }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   // Yeni eklenen alanlar
-  const [role, setRole] = useState('personel'); 
+   
   const [department, setDepartment] = useState('');
 
   // LoginPage.jsx içinde:
@@ -35,7 +35,7 @@ const handleSubmit = async (e) => {
     } else {
       // KAYIT İŞLEMİ
       const res = await axios.post(`${API_URL}/auth/register`, {
-        name, email, password, role, department
+        name, email, password, department
       });
       // Kayıt başarılıysa giriş sayfasına dön veya otomatik giriş yap
       alert("Hesap başarıyla oluşturuldu! Lütfen giriş yapın.");
@@ -67,13 +67,7 @@ const handleSubmit = async (e) => {
                 <label style={labelStyle}>Departman</label>
                 <input type="text" placeholder="Örn: Üretim, Lojistik" value={department} onChange={(e) => setDepartment(e.target.value)} style={inputStyle} required />
               </div>
-              <div style={inputContainer}>
-                <label style={labelStyle}>Yetki Seviyesi</label>
-                <select value={role} onChange={(e) => setRole(e.target.value)} style={{...inputStyle, backgroundColor: '#0f172a', cursor: 'pointer'}}>
-                  <option value="worker">Worker</option>
-                  <option value="admin">Yönetici (Admin)</option>
-                </select>
-              </div>
+              
             </>
           )}
 
