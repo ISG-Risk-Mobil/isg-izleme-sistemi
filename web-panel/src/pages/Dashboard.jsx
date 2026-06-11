@@ -59,7 +59,7 @@ export default function Dashboard({ role, onLogout, onBack }) {
     if (!isAdmin) return;
     setKullaniciYukleniyor(true);
     try {
-      const res = await fetch('http://localhost:5000/api/auth/users', {
+      const res = await fetch('http://localhost:5000/users', {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await res.json();
@@ -107,10 +107,13 @@ export default function Dashboard({ role, onLogout, onBack }) {
 
   useEffect(() => {
     const soket = io('http://localhost:5000');
-    soket.on('sensor-guncelleme', (yeniVeri) => {
-      const risk = yeniVeri.sensorData?.magnitude || 0;
-      setGrafikVerisi(onceki => [...onceki.slice(-19), { zaman: new Date().toLocaleTimeString().slice(0, 5), risk }]);
-    });
+    soket.on('sensorData', (yeniVeri) => {
+  const risk = yeniVeri.lastSensorValue || 0;
+  setGrafikVerisi(onceki => [...onceki.slice(-19), {
+    zaman: new Date().toLocaleTimeString().slice(0, 5),
+    risk
+  }]);
+});
     soket.on('new-alarm', (yeniAlarm) => {
       setAlarmlar(onceki => [yeniAlarm, ...onceki].slice(0, 5));
     });
