@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, {useEffect, useState} from 'react';
 
 import {
   View,
@@ -9,20 +9,28 @@ import {
   TouchableOpacity,
   StatusBar,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 
-import { useAuth } from '../../context/AuthContext';
-import { getDevices } from '../../services/api/deviceService';
-import { sendSensorData } from '../../services/api/sensorService';
-import { getSensorPayload } from '../../services/sensors/sensorService';
+import {useAuth} from '../../context/AuthContext';
+import {getDevices} from '../../services/api/deviceService';
+import {getUsers} from '../../services/api/authService';
+import {sendSensorData} from '../../services/api/sensorService';
+import {getSensorPayload} from '../../services/sensors/sensorService';
 
-const HomeScreen = ({ navigation }: any) => {
-  const { logout, user, token } = useAuth();
+const HomeScreen = ({navigation}: any) => {
+  const {user, token} = useAuth();
+
+  const isAdmin = user?.role === 'admin';
 
   const [systemStatus] = useState('AKTİF');
   const [riskLevel, setRiskLevel] = useState('DÜŞÜK');
   const [activeDevice, setActiveDevice] = useState<any>(null);
   const [sending, setSending] = useState(false);
+
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [adminUsers, setAdminUsers] = useState<any[]>([]);
+  const [showAllUsers, setShowAllUsers] = useState(false);
 
   const liveData = {
     acceleration: 'Gerçek veri hazır',
@@ -30,7 +38,7 @@ const HomeScreen = ({ navigation }: any) => {
     battery: 'Sensörden alınacak',
     network: 'Aktif',
     lastUpdate: activeDevice?.lastSeen
-      ? new Date(activeDevice.lastSeen).toLocaleString()
+      ? new Date(activeDevice.lastSeen).toLocaleString('tr-TR')
       : 'Henüz veri yok',
   };
 
@@ -45,7 +53,40 @@ const HomeScreen = ({ navigation }: any) => {
 
   useEffect(() => {
     fetchActiveDevice();
-  }, [token]);
+
+    if (isAdmin) {
+      fetchAdminPanelData();
+    }
+  }, [token, isAdmin]);
+
+  const normalizeUsersResponse = (response: any) => {
+    if (Array.isArray(response)) {
+      return response;
+    }
+
+    if (response?.success) {
+      return response.users || [];
+    }
+
+    return [];
+  };
+
+  const fetchAdminPanelData = async () => {
+    if (!token) return;
+
+    try {
+      setAdminLoading(true);
+
+      const usersResponse = await getUsers(token);
+      const users = normalizeUsersResponse(usersResponse);
+
+      setAdminUsers(users);
+    } catch (error) {
+      console.log('ADMIN PANEL ERROR:', error);
+    } finally {
+      setAdminLoading(false);
+    }
+  };
 
   const fetchActiveDevice = async () => {
     if (!token) return;
@@ -100,6 +141,10 @@ const HomeScreen = ({ navigation }: any) => {
         );
 
         fetchActiveDevice();
+
+        if (isAdmin) {
+          fetchAdminPanelData();
+        }
       } else {
         Alert.alert(
           'Hata',
@@ -116,6 +161,158 @@ const HomeScreen = ({ navigation }: any) => {
     }
   };
 
+  const workerCount = adminUsers.filter(
+    item => item.role === 'worker',
+  ).length;
+
+  const adminCount = adminUsers.filter(
+    item => item.role === 'admin',
+  ).length;
+
+  const visibleAdminUsers = showAllUsers
+    ? adminUsers
+    : adminUsers.slice(0, 2);
+
+  const renderAdminStatCard = (
+    label: string,
+    value: string | number,
+  ) => {
+    return (
+      <View style={styles.adminStatCard}>
+        <Text style={styles.adminStatLabel}>
+          {label}
+        </Text>
+
+        <Text style={styles.adminStatValue}>
+          {value}
+        </Text>
+      </View>
+    );
+  };
+
+  const renderAdminPanel = () => {
+    if (!isAdmin) return null;
+
+    return (
+      <View style={styles.adminPanel}>
+        <View style={styles.adminPanelHeader}>
+          <View>
+            <Text style={styles.adminPanelTitle}>
+              Yönetim Paneli
+            </Text>
+
+            <Text style={styles.adminPanelSubTitle}>
+              Admin hesabı — kullanıcı yönetimi
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.refreshButton}
+            onPress={fetchAdminPanelData}>
+            <Text style={styles.refreshButtonText}>
+              Yenile
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {adminLoading ? (
+          <ActivityIndicator
+            color="#F59E0B"
+            size="large"
+            style={styles.adminLoader}
+          />
+        ) : (
+          <>
+            <View style={styles.adminGrid}>
+              {renderAdminStatCard(
+                'Toplam Kullanıcı',
+                adminUsers.length,
+              )}
+
+              {renderAdminStatCard(
+                'Worker',
+                workerCount,
+              )}
+
+              {renderAdminStatCard(
+                'Admin',
+                adminCount,
+              )}
+            </View>
+
+            <View style={styles.adminUsersHeader}>
+              <Text style={styles.adminSectionTitle}>
+                Kullanıcılar
+              </Text>
+
+              <Text style={styles.adminUserCountText}>
+                {adminUsers.length} kişi
+              </Text>
+            </View>
+
+            {adminUsers.length === 0 ? (
+              <Text style={styles.adminEmptyText}>
+                Kullanıcı bulunamadı.
+              </Text>
+            ) : (
+              visibleAdminUsers.map((item, index) => (
+                <View
+                  key={item._id || item.id || index}
+                  style={styles.adminListCard}>
+                  <View style={styles.adminListLeft}>
+                    <View style={styles.avatarCircle}>
+                      <Text style={styles.avatarText}>
+                        {(item.name || '?').charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+
+                    <View style={styles.adminListInfo}>
+                      <Text style={styles.adminListTitle}>
+                        {item.name || 'İsimsiz Kullanıcı'}
+                      </Text>
+
+                      <Text style={styles.adminListSubText}>
+                        {item.email || 'E-posta yok'}
+                      </Text>
+
+                      <Text style={styles.adminListSubText}>
+                        Departman: {item.department || 'Genel'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View
+                    style={[
+                      styles.roleBadge,
+                      item.role === 'admin'
+                        ? styles.adminRoleBadge
+                        : styles.workerRoleBadge,
+                    ]}>
+                    <Text style={styles.roleBadgeText}>
+                      {item.role || 'worker'}
+                    </Text>
+                  </View>
+                </View>
+              ))
+            )}
+
+            {adminUsers.length > 2 && (
+              <TouchableOpacity
+                style={styles.adminViewAllButton}
+                onPress={() => setShowAllUsers(previous => !previous)}>
+                <Text style={styles.adminViewAllText}>
+                  {showAllUsers
+                    ? 'Daha az göster'
+                    : `Tüm kullanıcıları göster (${adminUsers.length})`}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </>
+        )}
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar
@@ -125,10 +322,9 @@ const HomeScreen = ({ navigation }: any) => {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContainer}
-      >
+        contentContainerStyle={styles.scrollContainer}>
         <View style={styles.header}>
-          <View>
+          <View style={styles.headerLeft}>
             <Text style={styles.welcomeText}>
               Mobil Güvenlik Platformu
             </Text>
@@ -140,6 +336,12 @@ const HomeScreen = ({ navigation }: any) => {
             <Text style={styles.userText}>
               Hoş geldin {user?.name || 'Kullanıcı'}
             </Text>
+
+            {isAdmin && (
+              <Text style={styles.adminModeText}>
+                Yönetici Görünümü
+              </Text>
+            )}
           </View>
 
           <View style={styles.statusBadge}>
@@ -148,6 +350,8 @@ const HomeScreen = ({ navigation }: any) => {
             </Text>
           </View>
         </View>
+
+        {renderAdminPanel()}
 
         <View style={styles.deviceCard}>
           <Text style={styles.cardTitle}>
@@ -176,8 +380,7 @@ const HomeScreen = ({ navigation }: any) => {
             style={[
               styles.riskLevel,
               riskLevel === 'YÜKSEK' && styles.highRiskText,
-            ]}
-          >
+            ]}>
             {riskLevel}
           </Text>
 
@@ -192,28 +395,40 @@ const HomeScreen = ({ navigation }: any) => {
 
         <View style={styles.dataGrid}>
           <View style={styles.dataCard}>
-            <Text style={styles.dataLabel}>İvme</Text>
+            <Text style={styles.dataLabel}>
+              İvme
+            </Text>
+
             <Text style={styles.dataValue}>
               {liveData.acceleration}
             </Text>
           </View>
 
           <View style={styles.dataCard}>
-            <Text style={styles.dataLabel}>Batarya</Text>
+            <Text style={styles.dataLabel}>
+              Batarya
+            </Text>
+
             <Text style={styles.dataValue}>
               {liveData.battery}
             </Text>
           </View>
 
           <View style={styles.dataCard}>
-            <Text style={styles.dataLabel}>Ağ</Text>
+            <Text style={styles.dataLabel}>
+              Ağ
+            </Text>
+
             <Text style={styles.dataValue}>
               {liveData.network}
             </Text>
           </View>
 
           <View style={styles.dataCard}>
-            <Text style={styles.dataLabel}>Güncelleme</Text>
+            <Text style={styles.dataLabel}>
+              Güncelleme
+            </Text>
+
             <Text style={styles.dataValueSmall}>
               {liveData.lastUpdate}
             </Text>
@@ -236,19 +451,17 @@ const HomeScreen = ({ navigation }: any) => {
           </Text>
 
           <TouchableOpacity
-            onPress={() => navigation.navigate('Alarmlar')}
-          >
+            onPress={() => navigation.navigate('Alarmlar')}>
             <Text style={styles.viewAllText}>
               Tümünü Gör
             </Text>
           </TouchableOpacity>
         </View>
 
-        {alerts.map((item) => (
+        {alerts.map(item => (
           <View
             key={item.id}
-            style={styles.alertCard}
-          >
+            style={styles.alertCard}>
             <View>
               <Text style={styles.alertTitle}>
                 {item.title}
@@ -274,8 +487,7 @@ const HomeScreen = ({ navigation }: any) => {
         <View style={styles.actionContainer}>
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => navigation.navigate('Dashboard')}
-          >
+            onPress={() => navigation.navigate('Dashboard')}>
             <Text style={styles.actionButtonText}>
               Analiz
             </Text>
@@ -283,8 +495,7 @@ const HomeScreen = ({ navigation }: any) => {
 
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => navigation.navigate('Cihazlar')}
-          >
+            onPress={() => navigation.navigate('Cihazlar')}>
             <Text style={styles.actionButtonText}>
               Cihazlar
             </Text>
@@ -294,15 +505,13 @@ const HomeScreen = ({ navigation }: any) => {
         <TouchableOpacity
           style={styles.sensorButton}
           onPress={handleSendSensorData}
-          disabled={sending}
-        >
+          disabled={sending}>
           <Text style={styles.actionButtonText}>
             {sending
               ? 'Gönderiliyor...'
               : 'Sensör Verisi Gönder'}
           </Text>
         </TouchableOpacity>
-
       </ScrollView>
     </SafeAreaView>
   );
@@ -324,9 +533,14 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 25,
     marginTop: 10,
+    gap: 12,
+  },
+
+  headerLeft: {
+    flex: 1,
   },
 
   welcomeText: {
@@ -347,6 +561,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
+  adminModeText: {
+    color: '#F59E0B',
+    marginTop: 6,
+    fontWeight: '700',
+  },
+
   statusBadge: {
     backgroundColor: '#14532D',
     paddingHorizontal: 14,
@@ -358,6 +578,190 @@ const styles = StyleSheet.create({
     color: '#4ADE80',
     fontWeight: 'bold',
     fontSize: 12,
+  },
+
+  adminPanel: {
+    backgroundColor: '#1E293B',
+    borderRadius: 22,
+    padding: 18,
+    marginBottom: 22,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+
+  adminPanelHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 16,
+  },
+
+  adminPanelTitle: {
+    color: '#F59E0B',
+    fontSize: 22,
+    fontWeight: 'bold',
+  },
+
+  adminPanelSubTitle: {
+    color: '#CBD5E1',
+    fontSize: 13,
+    marginTop: 5,
+  },
+
+  refreshButton: {
+    backgroundColor: '#0F172A',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+
+  refreshButtonText: {
+    color: '#F59E0B',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+
+  adminLoader: {
+    marginVertical: 20,
+  },
+
+  adminGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+
+  adminStatCard: {
+    backgroundColor: '#0F172A',
+    width: '48%',
+    borderRadius: 16,
+    padding: 15,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+
+  adminStatLabel: {
+    color: '#94A3B8',
+    fontSize: 13,
+    marginBottom: 8,
+  },
+
+  adminStatValue: {
+    color: 'white',
+    fontSize: 26,
+    fontWeight: 'bold',
+  },
+
+  adminUsersHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 12,
+  },
+
+  adminSectionTitle: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+
+  adminUserCountText: {
+    color: '#94A3B8',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
+  adminEmptyText: {
+    color: '#94A3B8',
+    marginBottom: 12,
+  },
+
+  adminListCard: {
+    backgroundColor: '#0F172A',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+
+  adminListLeft: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    flex: 1,
+    gap: 10,
+  },
+
+  avatarCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#334155',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  avatarText: {
+    color: '#CBD5E1',
+    fontWeight: 'bold',
+  },
+
+  adminListInfo: {
+    flex: 1,
+  },
+
+  adminListTitle: {
+    color: 'white',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+
+  adminListSubText: {
+    color: '#94A3B8',
+    marginTop: 4,
+    fontSize: 12,
+  },
+
+  roleBadge: {
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+
+  adminRoleBadge: {
+    backgroundColor: '#92400E',
+  },
+
+  workerRoleBadge: {
+    backgroundColor: '#14532D',
+  },
+
+  roleBadgeText: {
+    color: 'white',
+    fontWeight: '700',
+    fontSize: 10,
+  },
+
+  adminViewAllButton: {
+    backgroundColor: '#111827',
+    borderRadius: 12,
+    paddingVertical: 11,
+    alignItems: 'center',
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+
+  adminViewAllText: {
+    color: '#60A5FA',
+    fontWeight: '700',
   },
 
   deviceCard: {
@@ -532,19 +936,5 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
     fontSize: 15,
-  },
-
-  logoutButton: {
-    backgroundColor: '#7F1D1D',
-    paddingVertical: 16,
-    borderRadius: 16,
-    marginTop: 30,
-    alignItems: 'center',
-  },
-
-  logoutText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 16,
   },
 });

@@ -23,3 +23,13 @@ export const registerUser = (
     data: userData,
   });
 };
+
+export const getUsers = (
+  token: string,
+) => {
+  return apiCall({
+    endpoint: '/auth/users',
+    method: 'GET',
+    token,
+  });
+}; 

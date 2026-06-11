@@ -1,6 +1,4 @@
-import React, {
-  useState,
-} from 'react';
+import React, {useState} from 'react';
 
 import {
   View,
@@ -8,6 +6,8 @@ import {
   SafeAreaView,
   StyleSheet,
   Alert,
+  TouchableOpacity,
+  ScrollView,
 } from 'react-native';
 
 import COLORS from '../../constants/colors';
@@ -15,204 +15,195 @@ import COLORS from '../../constants/colors';
 import CustomInput from '../../components/common/CustomInput';
 import CustomButton from '../../components/common/CustomButton';
 
-import {
-  registerUser,
-} from '../../services/api/authService';
+import {registerUser} from '../../services/api/authService';
 
-const RegisterScreen = ({
-  navigation,
-}: any) => {
+const DEPARTMENTS = [
+  'Üretim',
+  'Bakım',
+  'Depo',
+  'Elektrik',
+  'Kimyasal Depo',
+  'Lojistik',
+  'Kalite Kontrol',
+  'Yönetim',
+  'Diğer',
+];
 
-  const [name, setName] =
-    useState('');
+const RegisterScreen = ({navigation}: any) => {
+  const [name, setName] = useState('');
 
-  const [email, setEmail] =
-    useState('');
+  const [email, setEmail] = useState('');
 
-  const [password, setPassword] =
-    useState('');
+  const [password, setPassword] = useState('');
 
-  const [department, setDepartment] =
-    useState('');
+  const [department, setDepartment] = useState('');
 
-  const [loading, setLoading] =
-    useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleRegister =
-    async () => {
+  const handleRegister = async () => {
+    if (!name || !email || !password || !department) {
+      Alert.alert('Hata', 'Alanları doldur');
 
-      if (
-        !name ||
-        !email ||
-        !password
-      ) {
-        Alert.alert(
-          'Hata',
-          'Alanları doldur',
-        );
+      return;
+    }
 
-        return;
-      }
+    setLoading(true);
 
-      setLoading(true);
+    const response = await registerUser({
+      name,
+      email,
+      password,
 
-      const response =
-        await registerUser(
-          {
-            name,
-            email,
-            password,
+      role: 'worker',
 
-            role:
-              'worker',
+      department,
+    });
 
-            department,
-          },
-        );
+    setLoading(false);
 
-      setLoading(false);
+    if (response.success) {
+      Alert.alert('Başarılı', 'Kayıt oluşturuldu');
 
-      if (
-        response.success
-      ) {
-
-        Alert.alert(
-          'Başarılı',
-          'Kayıt oluşturuldu',
-        );
-
-        navigation.goBack();
-
-      } else {
-
-        Alert.alert(
-          'Hata',
-          response.message,
-        );
-
-      }
-
-    };
+      navigation.goBack();
+    } else {
+      Alert.alert('Hata', response.message);
+    }
+  };
 
   return (
-    <SafeAreaView
-      style={
-        styles.container
-      }
-    >
-      <View
-        style={
-          styles.card
-        }
-      >
+    <SafeAreaView style={styles.container}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}>
+        <View style={styles.card}>
+          <Text style={styles.title}>Kayıt Ol</Text>
 
-        <Text
-          style={
-            styles.title
-          }
-        >
-          Kayıt Ol
-        </Text>
+          <CustomInput label="Ad Soyad" value={name} onChangeText={setName} />
 
-        <CustomInput
-          label="Ad Soyad"
-          value={name}
-          onChangeText={
-            setName
-          }
-        />
+          <CustomInput label="E-Posta" value={email} onChangeText={setEmail} />
 
-        <CustomInput
-          label="E-Posta"
-          value={email}
-          onChangeText={
-            setEmail
-          }
-        />
+          <CustomInput
+            label="Şifre"
+            secureTextEntry
+            value={password}
+            onChangeText={setPassword}
+          />
 
-        <CustomInput
-          label="Şifre"
-          secureTextEntry
-          value={
-            password
-          }
-          onChangeText={
-            setPassword
-          }
-        />
+          <Text style={styles.label}>Departman</Text>
 
-        <CustomInput
-          label="Departman"
-          value={
-            department
-          }
-          onChangeText={
-            setDepartment
-          }
-        />
+          <View style={styles.departmentList}>
+            {DEPARTMENTS.map(item => {
+              const selected = department === item;
 
-        <CustomButton
-          title={
-            loading
-              ? 'Oluşturuluyor...'
-              : 'Kayıt Ol'
-          }
+              return (
+                <TouchableOpacity
+                  key={item}
+                  style={[
+                    styles.departmentButton,
+                    selected && styles.departmentButtonSelected,
+                  ]}
+                  onPress={() => setDepartment(item)}>
+                  <Text
+                    style={[
+                      styles.departmentText,
+                      selected && styles.departmentTextSelected,
+                    ]}>
+                    {item}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
 
-          onPress={
-            handleRegister
-          }
-        />
+          <CustomInput
+            label="Departman yoksa elle yaz"
+            value={department}
+            onChangeText={setDepartment}
+          />
 
-        <Text
-          style={
-            styles.link
-          }
+          <CustomButton
+            title={loading ? 'Oluşturuluyor...' : 'Kayıt Ol'}
+            onPress={handleRegister}
+          />
 
-          onPress={() =>
-            navigation.goBack()
-          }
-        >
-          Giriş Yap
-        </Text>
-
-      </View>
+          <Text style={styles.link} onPress={() => navigation.goBack()}>
+            Giriş Yap
+          </Text>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 };
 
 export default RegisterScreen;
 
-const styles =
-StyleSheet.create({
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+    padding: 20,
+  },
 
-container:{
-flex:1,
-backgroundColor:
-COLORS.background,
-justifyContent:
-'center',
-padding:20,
-},
+  card: {
+    backgroundColor: '#121E35',
+    padding: 24,
+    borderRadius: 24,
+  },
 
-card:{
-backgroundColor:
-'#121E35',
-padding:24,
-borderRadius:24,
-},
+  title: {
+    color: COLORS.white,
+    fontSize: 28,
+    fontWeight: '700',
+    marginBottom: 20,
+  },
 
-title:{
-color:
-COLORS.white,
-fontSize:28,
-fontWeight:'700',
-marginBottom:20,
-},
+  link: {
+    color: '#60A5FA',
+    textAlign: 'center',
+    marginTop: 20,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
 
-link:{
-color:'#60A5FA',
-textAlign:'center',
-marginTop:20,
-},
+  label: {
+    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 10,
+    marginTop: 8,
+  },
 
+  departmentList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 16,
+  },
+
+  departmentButton: {
+    borderWidth: 1,
+    borderColor: '#334155',
+    borderRadius: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: '#0F172A',
+  },
+
+  departmentButtonSelected: {
+    backgroundColor: '#2563EB',
+    borderColor: '#60A5FA',
+  },
+
+  departmentText: {
+    color: '#CBD5E1',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+
+  departmentTextSelected: {
+    color: COLORS.white,
+    fontWeight: '700',
+  },
 });
