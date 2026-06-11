@@ -6,8 +6,8 @@ const User = require('../models/User');
 const Device = require('../models/Device');
 const { protect } = require('../middleware/auth');
 
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
+const generateToken = (id, role) => {
+  return jwt.sign({ id, role }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRE
   });
 };
@@ -43,7 +43,7 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    const token = generateToken(user._id);
+    const token = generateToken(user._id,user.role);
 
     res.status(201).json({
       success: true,
@@ -77,7 +77,7 @@ router.post('/login', async (req, res) => {
     if (!isMatch) {
       return res.status(401).json({ success: false, message: 'Gecersiz email veya sifre' });
     }
-    const token = generateToken(user._id);
+    const token = generateToken(user._id,user.role);
     res.json({
       success: true,
       token,
