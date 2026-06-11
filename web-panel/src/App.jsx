@@ -127,21 +127,27 @@ const handleLogin = (userData) => {
                   style={inputStyle}
                 />
                 <button onClick={handleDirectLogin} style={primaryBtn}>
-                  Giriş Yap
-                </button>
+  Giriş Yap
+</button>
+<button onClick={() => setIsAuthOpen('forgot')} style={{ background: 'none', border: 'none', color: '#EAB308', cursor: 'pointer', fontSize: '13px', marginTop: '-5px' }}>
+  Şifremi Unuttum
+</button>
                 <button onClick={() => setIsAuthOpen('register')} style={secondaryBtn}>
                   Hesap Oluştur
                 </button>
               </div>
             ) : (
-              <div style={authContainer}>
-                <button onClick={() => setIsAuthOpen(false)} style={backBtn}>← Geri Dön</button>
-                <Login 
-                  baslangicKayitMi={isAuthOpen === 'register'} 
-                  onLogin={handleLogin} 
-                />
-              </div>
-            )}
+              
+  <div style={authContainer}>
+    <button onClick={() => setIsAuthOpen(false)} style={backBtn}>← Geri Dön</button>
+    <Login 
+      baslangicKayitMi={isAuthOpen === 'register'}
+      baslangicSifreUnuttumMu={isAuthOpen === 'forgot'}
+      onLogin={handleLogin} 
+    />
+  </div>
+)}
+            
           </section>
         </div>
       )}

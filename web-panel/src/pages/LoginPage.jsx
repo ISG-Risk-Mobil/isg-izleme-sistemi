@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { Eye, EyeOff, Shield, UserPlus } from 'lucide-react';
+import { Eye, EyeOff, Shield, UserPlus, ArrowLeft, Mail, KeyRound } from 'lucide-react';
 
 const RENKLER = {
   navy: '#0B1120',
@@ -10,49 +10,168 @@ const RENKLER = {
   border: 'rgba(255, 255, 255, 0.1)'
 };
 
-function LoginPage({ baslangicKayitMi, onLogin }) {
+const API_URL = 'http://localhost:5000/api';
+
+function LoginPage({ baslangicKayitMi, baslangicSifreUnuttumMu, onLogin }) {
   const [isLogin, setIsLogin] = useState(!baslangicKayitMi);
   const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  // Yeni eklenen alanlar
-   
   const [department, setDepartment] = useState('');
 
-  // LoginPage.jsx içinde:
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  const API_URL = 'http://localhost:5000/api';
+  // Şifremi unuttum adımları: null | 'email' | 'reset'
+  const [sifreAdim, setSifreAdim] = useState(baslangicSifreUnuttumMu ? 'email' : null);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetToken, setResetToken] = useState('');
+  const [yeniSifre, setYeniSifre] = useState('');
+  const [yeniSifreTekrar, setYeniSifreTekrar] = useState('');
+  const [yukleniyor, setYukleniyor] = useState(false);
+  const [mesaj, setMesaj] = useState(null);
 
-  try {
-    if (isLogin) {
-      // GİRİŞ İŞLEMİ
-      const res = await axios.post(`${API_URL}/auth/login`, { email, password });
-      localStorage.setItem('token', res.data.token);
-      localStorage.setItem('role', res.data.user.role);
-      onLogin({ token: res.data.token, role: res.data.user.role, name: res.data.user.name });
-    } else {
-      // KAYIT İŞLEMİ
-      const res = await axios.post(`${API_URL}/auth/register`, {
-        name, email, password, department
-      });
-      // Kayıt başarılıysa giriş sayfasına dön veya otomatik giriş yap
-      alert("Hesap başarıyla oluşturuldu! Lütfen giriş yapın.");
-      setIsLogin(true); 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (isLogin) {
+        const res = await axios.post(`${API_URL}/auth/login`, { email, password });
+        localStorage.setItem('token', res.data.token);
+        localStorage.setItem('role', res.data.user.role);
+        localStorage.setItem('userName', res.data.user.name);
+        localStorage.setItem('userEmail', res.data.user.email);
+        onLogin({ token: res.data.token, role: res.data.user.role, name: res.data.user.name });
+      } else {
+        await axios.post(`${API_URL}/auth/register`, { name, email, password, department });
+        alert("Hesap başarıyla oluşturuldu! Lütfen giriş yapın.");
+        setIsLogin(true);
+      }
+    } catch (err) {
+      alert("Hata: " + (err.response?.data?.message || "İşlem başarısız"));
     }
-  } catch (err) {
-    console.error(err);
-    alert("Hata: " + (err.response?.data?.message || "İşlem başarısız"));
-  }
-};
+  };
 
+  // Adım 1: Email gönder, resetToken al
+  const sifreResetEmailGonder = async () => {
+    if (!resetEmail) { setMesaj({ tip: 'hata', metin: 'Email adresinizi girin.' }); return; }
+    setYukleniyor(true);
+    setMesaj(null);
+    try {
+      const res = await axios.post(`${API_URL}/auth/forgot-password`, { email: resetEmail });
+      setResetToken(res.data.resetToken);
+      setSifreAdim('reset');
+      setMesaj({ tip: 'basari', metin: 'Token alındı. Yeni şifrenizi belirleyin.' });
+    } catch (err) {
+      setMesaj({ tip: 'hata', metin: err.response?.data?.message || 'Email bulunamadı.' });
+    } finally {
+      setYukleniyor(false);
+    }
+  };
+
+  // Adım 2: Yeni şifreyi kaydet
+  const sifreSifirla = async () => {
+    if (!yeniSifre || !yeniSifreTekrar) { setMesaj({ tip: 'hata', metin: 'Tüm alanları doldurun.' }); return; }
+    if (yeniSifre !== yeniSifreTekrar) { setMesaj({ tip: 'hata', metin: 'Şifreler eşleşmiyor.' }); return; }
+    if (yeniSifre.length < 6) { setMesaj({ tip: 'hata', metin: 'Şifre en az 6 karakter olmalı.' }); return; }
+    setYukleniyor(true);
+    setMesaj(null);
+    try {
+      await axios.post(`${API_URL}/auth/reset-password`, {
+        resetToken,
+        newPassword: yeniSifre
+      });
+      setMesaj({ tip: 'basari', metin: 'Şifre güncellendi! Giriş yapabilirsiniz.' });
+      setTimeout(() => {
+        setSifreAdim(null);
+        setResetEmail('');
+        setResetToken('');
+        setYeniSifre('');
+        setYeniSifreTekrar('');
+        setMesaj(null);
+      }, 2000);
+    } catch (err) {
+      setMesaj({ tip: 'hata', metin: err.response?.data?.message || 'Şifre sıfırlanamadı.' });
+    } finally {
+      setYukleniyor(false);
+    }
+  };
+
+  // ──── ŞİFREMİ UNUTTUM EKRANI ────
+  if (sifreAdim === 'email') {
+    return (
+      <div style={pageContainer}>
+        <div style={glassCardStyle}>
+          <div style={logoWrapper}>
+            <div style={iconStyle}><Mail size={32}/></div>
+            <h1 style={titleStyle}>Şifre <span style={{ color: RENKLER.accent }}>Sıfırla</span></h1>
+            <p style={subtitleStyle}>Kayıtlı email adresinizi girin</p>
+          </div>
+
+          {mesaj && (
+            <div style={{ padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', backgroundColor: mesaj.tip === 'hata' ? '#ef444420' : '#22c55e20', color: mesaj.tip === 'hata' ? '#ef4444' : '#22c55e', border: `1px solid ${mesaj.tip === 'hata' ? '#ef444440' : '#22c55e40'}` }}>
+              {mesaj.metin}
+            </div>
+          )}
+
+          <div style={inputContainer}>
+            <label style={labelStyle}>E-Posta Adresi</label>
+            <input type="email" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} style={inputStyle} placeholder="ornek@email.com"/>
+          </div>
+
+          <button onClick={sifreResetEmailGonder} disabled={yukleniyor} style={buttonStyle}>
+            {yukleniyor ? 'Gönderiliyor...' : 'Devam Et'}
+          </button>
+
+          <button onClick={() => { setSifreAdim(null); setMesaj(null); }} style={toggleButton}>
+            <ArrowLeft size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }}/> Giriş sayfasına dön
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (sifreAdim === 'reset') {
+    return (
+      <div style={pageContainer}>
+        <div style={glassCardStyle}>
+          <div style={logoWrapper}>
+            <div style={iconStyle}><KeyRound size={32}/></div>
+            <h1 style={titleStyle}>Yeni <span style={{ color: RENKLER.accent }}>Şifre</span></h1>
+            <p style={subtitleStyle}>Yeni şifrenizi belirleyin</p>
+          </div>
+
+          {mesaj && (
+            <div style={{ padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', backgroundColor: mesaj.tip === 'hata' ? '#ef444420' : '#22c55e20', color: mesaj.tip === 'hata' ? '#ef4444' : '#22c55e', border: `1px solid ${mesaj.tip === 'hata' ? '#ef444440' : '#22c55e40'}` }}>
+              {mesaj.metin}
+            </div>
+          )}
+
+          <div style={inputContainer}>
+            <label style={labelStyle}>Yeni Şifre</label>
+            <input type="password" value={yeniSifre} onChange={(e) => setYeniSifre(e.target.value)} style={inputStyle} placeholder="En az 6 karakter"/>
+          </div>
+          <div style={inputContainer}>
+            <label style={labelStyle}>Yeni Şifre Tekrar</label>
+            <input type="password" value={yeniSifreTekrar} onChange={(e) => setYeniSifreTekrar(e.target.value)} style={inputStyle} placeholder="Şifreyi tekrar girin"/>
+          </div>
+
+          <button onClick={sifreSifirla} disabled={yukleniyor} style={buttonStyle}>
+            {yukleniyor ? 'Kaydediliyor...' : 'Şifremi Güncelle'}
+          </button>
+
+          <button onClick={() => { setSifreAdim('email'); setMesaj(null); }} style={toggleButton}>
+            <ArrowLeft size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }}/> Geri
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ──── NORMAL GİRİŞ / KAYIT EKRANI ────
   return (
     <div style={pageContainer}>
       <div style={glassCardStyle}>
         <div style={logoWrapper}>
-          <div style={iconStyle}>{isLogin ? <Shield size={32} /> : <UserPlus size={32} />}</div>
-          <h1 style={titleStyle}>VISION<span style={{color: RENKLER.accent}}>GUARD</span></h1>
+          <div style={iconStyle}>{isLogin ? <Shield size={32}/> : <UserPlus size={32}/>}</div>
+          <h1 style={titleStyle}>VISION<span style={{ color: RENKLER.accent }}>GUARD</span></h1>
           <p style={subtitleStyle}>{isLogin ? 'Sisteme giriş yaparak devam edin' : 'Kurumsal hesabınızı oluşturun'}</p>
         </div>
 
@@ -61,29 +180,35 @@ const handleSubmit = async (e) => {
             <>
               <div style={inputContainer}>
                 <label style={labelStyle}>Ad Soyad</label>
-                <input type="text" value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} required />
+                <input type="text" value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} required/>
               </div>
               <div style={inputContainer}>
                 <label style={labelStyle}>Departman</label>
-                <input type="text" placeholder="Örn: Üretim, Lojistik" value={department} onChange={(e) => setDepartment(e.target.value)} style={inputStyle} required />
+                <input type="text" placeholder="Örn: Üretim, Lojistik" value={department} onChange={(e) => setDepartment(e.target.value)} style={inputStyle} required/>
               </div>
-              
             </>
           )}
 
           <div style={inputContainer}>
             <label style={labelStyle}>E-Posta Adresi</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} required />
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} required/>
           </div>
-          
-          <div style={{...inputContainer, position: 'relative'}}>
+
+          <div style={{ ...inputContainer, position: 'relative' }}>
             <label style={labelStyle}>Şifre</label>
-            <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} style={inputStyle} required />
+            <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} style={inputStyle} required/>
             <button type="button" onClick={() => setShowPassword(!showPassword)} style={eyeButtonStyle}>
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              {showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}
             </button>
           </div>
-          
+
+          {/* Şifremi Unuttum linki — sadece login modunda */}
+          {isLogin && (
+            <button type="button" onClick={() => setSifreAdim('email')} style={{ ...toggleButton, textAlign: 'right', marginTop: '-10px', marginBottom: '10px', color: RENKLER.accent }}>
+              Şifremi Unuttum
+            </button>
+          )}
+
           <button type="submit" style={buttonStyle}>
             {isLogin ? 'SİSTEME GİRİŞ YAP' : 'HESABI OLUŞTUR'}
           </button>
