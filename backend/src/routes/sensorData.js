@@ -55,6 +55,9 @@ router.post('/', protect, async (req, res) => {
       },
       lastLogs
     );
+    
+
+console.log('Detected alarms:', detectedAlarms);
 
     const savedAlarms = [];
     for (const alarmData of detectedAlarms) {

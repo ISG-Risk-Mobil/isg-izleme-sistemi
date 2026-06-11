@@ -72,18 +72,19 @@ export default function Dashboard({ role, onLogout, onBack }) {
     }
   };
 
-  const fetchAlarmlar = async () => {
-    try {
-      const res = await fetch('http://localhost:5000/alert', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-      const data = await res.json();
-      if (Array.isArray(data)) setAlarmlar(data.slice(0, 5));
-    } catch (err) {
-      console.error('Alarmlar çekilemedi:', err);
-    }
-  };
-
+  // YENİ ALARMLAR 
+// Güncellenmiş fetchAlarmlar fonksiyonu
+const fetchAlarmlar = async () => {
+  try {
+    const res = await fetch('http://localhost:5000/api/auth/alerts', {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    });
+    const data = await res.json();
+    if (data.success) setAlarmlar(data.alerts);
+  } catch (err) {
+    console.error('Alarmlar çekilemedi:', err);
+  }
+};
   const fetchCihazlar = async () => {
     try {
       const res = await fetch('http://localhost:5000/api/auth/devices', {
@@ -129,19 +130,31 @@ export default function Dashboard({ role, onLogout, onBack }) {
   };
 
   useEffect(() => {
-    const soket = io('http://localhost:5000');
-    soket.on('sensorData', (yeniVeri) => {
-      const risk = yeniVeri.lastSensorValue || 0;
-      setGrafikVerisi(onceki => [...onceki.slice(-19), {
+  const soket = io('http://localhost:5000');
+
+  soket.on('sensor-update', (yeniVeri) => {
+    console.log('Yeni sensör verisi:', yeniVeri);
+
+    const risk =
+      yeniVeri.accelerometer?.magnitude || 0;
+
+    setGrafikVerisi(prev => [
+      ...prev.slice(-19),
+      {
         zaman: new Date().toLocaleTimeString().slice(0, 5),
         risk
-      }]);
-    });
-    soket.on('newUser', (yeniKullanici) => {
-      setKullaniciListesi(onceki => [yeniKullanici, ...onceki]);
-    });
-    return () => soket.disconnect();
-  }, []);
+      }
+    ]);
+  });
+
+  soket.on('new-alarm', (alarm) => {
+    console.log('Yeni alarm:', alarm);
+
+    setAlarmlar(prev => [alarm, ...prev]);
+  });
+
+  return () => soket.disconnect();
+}, []);
 
   const handleLogout = () => {
     localStorage.clear();
@@ -319,6 +332,28 @@ export default function Dashboard({ role, onLogout, onBack }) {
           ))}
         </div>
       </div>
+
+      {/* Tüm Fabrika Alarmları */}
+<div style={{ ...styles.card, gridColumn: 'span 12' }}>
+  <p style={styles.title}><AlertTriangle size={14}/> Tüm Fabrika Alarmları</p>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto' }}>
+    {alarmlar.length === 0
+      ? <p style={{ color: '#64748b', fontSize: '13px', textAlign: 'center', padding: '20px' }}>Alarm yok.</p>
+      : alarmlar.map((a, i) => (
+        <div key={a._id || i} style={{ padding: '12px 14px', backgroundColor: '#0f172a', borderRadius: '10px', borderLeft: `3px solid ${a.severity === 'high' ? '#ef4444' : a.severity === 'medium' ? '#f59e0b' : '#22c55e'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <p style={{ margin: 0, fontSize: '13px', color: '#e2e8f0' }}>{a.message}</p>
+            <p style={{ margin: 0, fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+              {a.userId?.name || 'Bilinmiyor'} · {new Date(a.createdAt).toLocaleString('tr-TR')}
+            </p>
+          </div>
+          <span style={styles.badge(a.severity === 'high' ? '#ef4444' : a.severity === 'medium' ? '#f59e0b' : '#22c55e')}>
+            {a.severity || 'normal'}
+          </span>
+        </div>
+      ))}
+  </div>
+</div>
     </div>
   );
 

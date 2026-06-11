@@ -261,4 +261,19 @@ router.get('/devices', protect, async (req, res) => {
   }
 });
 
+// Alarmlar — personel kendi alarmlarını, admin tümünü görür
+router.get('/alerts', protect, async (req, res) => {
+  try {
+    const Alarm = require('../models/Alarm'); // Alarm modeli
+    const query = req.user.role === 'admin' ? {} : { userId: req.user._id };
+    const alerts = await Alarm.find(query)
+      .populate('userId', 'name email')
+      .sort({ createdAt: -1 })
+      .limit(50);
+    res.json({ success: true, alerts });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 module.exports = router;
