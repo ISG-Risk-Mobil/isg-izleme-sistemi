@@ -70,7 +70,9 @@ console.log('Detected alarms:', detectedAlarms);
       req.app.get('io').emit('new-alarm', alarm);
     }
 
-    req.app.get('io').emit('sensor-update', log);
+    //req.app.get('io').emit('sensor-update', log);
+    // herkese değil, sadece o kullanıcıya gönder
+    req.app.get('io').to(`user_${req.user._id}`).emit('sensor-update', log);
 
     res.status(201).json({ 
       success: true, 
@@ -123,4 +125,62 @@ router.post('/vision-violation', protect, async (req, res) => {
   }
 });
 
+//GPS İÇİN EKLENDİ
+// Kullanıcının son konum bilgisini döndür (admin için)
+router.get('/user-location/:userId', protect, async (req, res) => {
+  try {
+    // Kullanıcının cihazını bul
+    const device = await Device.findOne({ assignedUser: req.params.userId });
+    if (!device) {
+      return res.status(404).json({ success: false, message: 'Cihaz bulunamadı' });
+    }
+
+    // O cihazın location içeren en son log'unu çek
+    const sonLog = await SensorLog.findOne({
+      deviceId: device._id,
+      'location': { $exists: true, $ne: null }
+    }).sort({ timestamp: -1 });
+
+    if (!sonLog || !sonLog.location) {
+      return res.status(404).json({ success: false, message: 'Konum verisi henüz yok' });
+    }
+
+    res.json({
+      success: true,
+      location: sonLog.location,
+      lastSeen: sonLog.timestamp,
+      deviceId: device._id
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Giriş yapan kullanıcının kendi son konum bilgisi
+router.get('/my-location', protect, async (req, res) => {
+  try {
+    const device = await Device.findOne({ assignedUser: req.user._id });
+    
+    if (!device) {
+      return res.status(404).json({ success: false, message: 'Cihaz bulunamadı' });
+    }
+
+    const sonLog = await SensorLog.findOne({
+      deviceId: device._id,
+      location: { $exists: true, $ne: null }
+    }).sort({ timestamp: -1 });
+
+    if (!sonLog?.location) {
+      return res.status(404).json({ success: false, message: 'Konum verisi henüz yok' });
+    }
+
+    res.json({
+      success: true,
+      location: sonLog.location,
+      lastSeen: sonLog.timestamp
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
 module.exports = router;

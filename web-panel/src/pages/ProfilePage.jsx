@@ -8,12 +8,14 @@ export default function ProfilSayfasi({ kullanici = {}, geriDon }) {
   const [sifreDegistiriliyorMu, setSifreDegistiriliyorMu] = useState(false);
   const [mesaj, setMesaj] = useState(null);
   const [mesajTip, setMesajTip] = useState('basari');
+  const sonGiris = localStorage.getItem('sonGirisTarihi');
 
   const [formData, setFormData] = useState({
     name:       kullanici?.name       || localStorage.getItem('userName')  || '',
     email:      kullanici?.email      || localStorage.getItem('userEmail') || '',
     department: kullanici?.department || localStorage.getItem('userDept')  || '',
   });
+
 
   // ← Eksik olan state burası
   const [sifreBilgileri, setSifreBilgileri] = useState({
@@ -157,24 +159,49 @@ export default function ProfilSayfasi({ kullanici = {}, geriDon }) {
                   <input disabled={!duzenle} value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} style={{ ...stiller.girdi, opacity: duzenle ? 1 : 0.7 }} />
                 </div>
                 <div>
-                  <label style={{ color: '#94a3b8', fontSize: '12px' }}>Email</label>
-                  <input disabled={!duzenle} value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} style={{ ...stiller.girdi, opacity: duzenle ? 1 : 0.7 }} />
-                </div>
+  <label style={{ color: '#94a3b8', fontSize: '12px', marginBottom: '4px', display: 'block' }}>Email</label>
+  <input 
+    disabled={!duzenle} 
+    value={formData.email} 
+    onChange={(e) => setFormData({...formData, email: e.target.value})} 
+    placeholder="Email adresi girilmemiş"
+    style={{ 
+      ...stiller.girdi, 
+      opacity: duzenle ? 1 : 0.7,
+      backgroundColor: duzenle ? '#1e293b' : '#0f172a',
+      color: '#e2e8f0',
+      width: '100%',
+      padding: '10px',
+      borderRadius: '6px',
+      border: '1px solid #334155'
+    }} 
+  />
+</div>
                 <div>
                   <label style={{ color: '#94a3b8', fontSize: '12px' }}>Departman</label>
                   <input disabled={!duzenle} value={formData.department} onChange={(e) => setFormData({...formData, department: e.target.value})} style={{ ...stiller.girdi, opacity: duzenle ? 1 : 0.7 }} />
                 </div>
                 <div>
                   <label style={{ color: '#94a3b8', fontSize: '12px' }}>Rol</label>
-                  <div style={{ ...stiller.girdi, marginTop: '5px', opacity: 0.6 }}>{(kullanici?.role || 'User').toUpperCase()}</div>
+                  <div style={{ ...stiller.girdi, marginTop: '5px', opacity: 0.6 }}>{(kullanici?.role || 'Admin').toUpperCase()}</div>
                 </div>
               </div>
 
               <h3 style={{ ...stiller.baslik, marginTop: '30px' }}>Sistem & Hesap Detayları</h3>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                 <div style={{ padding: '15px', backgroundColor: '#0f172a', borderRadius: '10px' }}>
-                  <div style={{ color: '#94a3b8', fontSize: '12px' }}>Son Giriş</div>
-                  <div style={{ fontWeight: 'bold' }}>{localStorage.getItem('lastLogin') || 'Bilinmiyor'}</div>
+                  
+                  <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#0f172a', borderRadius: '8px' }}>
+  <p style={{ margin: '0 0 5px 0', fontSize: '12px', color: '#94a3b8' }}>Son Giriş</p>
+  <p style={{ margin: 0, fontSize: '14px', color: '#e2e8f0', fontWeight: '500' }}>
+    {sonGiris 
+      ? new Date(sonGiris).toLocaleString('tr-TR', { 
+          day: '2-digit', month: 'long', year: 'numeric', 
+          hour: '2-digit', minute: '2-digit' 
+        }) 
+      : 'Henüz giriş kaydı yok'}
+  </p>
+</div>
                 </div>
                 <div style={{ padding: '15px', backgroundColor: '#0f172a', borderRadius: '10px' }}>
                   <div style={{ color: '#94a3b8', fontSize: '12px' }}>Durum</div>

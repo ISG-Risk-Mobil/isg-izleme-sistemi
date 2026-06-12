@@ -264,8 +264,11 @@ router.get('/devices', protect, async (req, res) => {
 // Alarmlar — personel kendi alarmlarını, admin tümünü görür
 router.get('/alerts', protect, async (req, res) => {
   try {
-    const Alarm = require('../models/Alarm'); // Alarm modeli
-    const query = req.user.role === 'admin' ? {} : { userId: req.user._id };
+    const Alarm = require('../models/Alarm');
+    const sadecKendi = req.query.kendi === 'true';
+    const query = (req.user.role !== 'admin' || sadecKendi)
+      ? { userId: req.user._id }
+      : {};
     const alerts = await Alarm.find(query)
       .populate('userId', 'name email')
       .sort({ createdAt: -1 })
@@ -276,4 +279,72 @@ router.get('/alerts', protect, async (req, res) => {
   }
 });
 
+/*router.get('/my-sensor', protect, async (req, res) => {
+  try {
+    const Device = require('../models/Device');
+    const SensorLog = require('../models/SensorLog');
+    
+    const device = await Device.findOne({ assignedUser: req.user._id });
+    if (!device) {
+      return res.json({ success: true, log: null });
+    }
+    
+    const log = await SensorLog.findOne({ deviceId: device._id })
+      .sort({ timestamp: -1 });
+    
+    res.json({ success: true, log });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+*/
+
+router.get('/my-sensor', protect, async (req, res) => {
+  try {
+    const Device = require('../models/Device');
+    const SensorLog = require('../models/SensorLog');
+    const Alarm = require('../models/Alarm');
+
+    // Önce assignedUser ile ara
+    let device = await Device.findOne({ assignedUser: req.user._id });
+
+    // Bulamazsan kullanıcının alarmlarındaki deviceId'yi kullan
+    if (!device) {
+      const lastAlarm = await Alarm.findOne({ userId: req.user._id }).sort({ createdAt: -1 });
+      if (lastAlarm) {
+        device = await Device.findById(lastAlarm.deviceId);
+      }
+    }
+
+    if (!device) return res.json({ success: true, logs: [] });
+
+    const logs = await SensorLog.find({ deviceId: device._id })
+      .sort({ timestamp: -1 })
+       // .limit(20) ← bunu sil
+
+    res.json({ success: true, logs: logs.reverse() });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+//ÇÖZÜLMÜŞ ALARM ENDPOİNTİ eklendi
+router.put('/alarms/:id/resolve', async (req, res) => {
+
+  const alarm = await Alarm.findByIdAndUpdate(
+    req.params.id,
+    {
+      resolved: true
+    },
+    {
+      new: true
+    }
+  );
+
+  res.json({
+    success: true,
+    alarm
+  });
+
+});
 module.exports = router;
