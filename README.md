@@ -505,7 +505,7 @@ isg-izleme-sistemi/
 |---|---|---|
 | 23360859076 | Büşra Yesin | [@busrayesinn](https://github.com/busrayesinn) |
 | 23360859078 | İsmihan Kırmızıoğlan | [@ismihankrmz](https://github.com/ismihankrmz) |
-| 22360859400 | Eda Şen | [@EdaaSen](https://github.com/EdaaSen) |
+| 22360859400 | Eda Şen | [@EdaaSenn](https://github.com/EdaaSen) |
 | 22360859017 | Melike Dal | [@melikedal](https://github.com/melikedal) |
 
 ---
