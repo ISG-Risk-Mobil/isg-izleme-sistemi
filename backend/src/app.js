@@ -28,10 +28,16 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date() });
 });
 
-io.on('connection', (socket) => {
+/*io.on('connection', (socket) => {
   console.log('İstemci bağlandı:', socket.id);
   socket.on('disconnect', () => {
     console.log('İstemci ayrıldı:', socket.id);
+  });
+});*/
+io.on('connection', (socket) => {
+  socket.on('join', (userId) => {
+    socket.join(`user_${userId}`);
+    console.log(`Kullanıcı ${userId} kendi room'una katıldı`);
   });
 });
 
