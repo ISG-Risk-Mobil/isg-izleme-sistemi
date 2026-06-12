@@ -9,6 +9,8 @@ import DashboardScreen from '../screens/dashboard/DashboardScreen';
 import AlarmScreen from '../screens/alarms/AlarmScreen';
 import DevicesScreen from '../screens/devices/DevicesScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
+import AdminManagementScreen from '../screens/admin/AdminManagementScreen';
+import LocationScreen from '../screens/location/LocationScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -34,7 +36,7 @@ const BottomTabNavigator = () => {
           fontWeight: '600',
         },
 
-        tabBarIcon: ({color, size, focused}) => {
+        tabBarIcon: ({color, focused}) => {
           let iconName: string = 'home';
 
           if (route.name === 'AnaSayfa') {
@@ -47,6 +49,12 @@ const BottomTabNavigator = () => {
             iconName = focused ? 'phone-portrait' : 'phone-portrait-outline';
           } else if (route.name === 'Profil') {
             iconName = focused ? 'person' : 'person-outline';
+          } else if (route.name === 'YonetimPaneli') {
+            iconName = focused
+              ? 'shield-checkmark'
+              : 'shield-checkmark-outline';
+          } else if (route.name === 'Konum') {
+            iconName = focused ? 'location' : 'location-outline';
           }
 
           return <Ionicons name={iconName} size={22} color={color} />;
@@ -89,6 +97,34 @@ const BottomTabNavigator = () => {
         component={ProfileScreen}
         options={{
           tabBarLabel: 'Profil',
+        }}
+      />
+
+      <Tab.Screen
+        name="YonetimPaneli"
+        component={AdminManagementScreen}
+        options={{
+          tabBarButton: () => null,
+          tabBarItemStyle: {
+            display: 'none',
+          },
+          tabBarStyle: {
+            display: 'none',
+          },
+        }}
+      />
+
+      <Tab.Screen
+        name="Konum"
+        component={LocationScreen}
+        options={{
+          tabBarButton: () => null,
+          tabBarItemStyle: {
+            display: 'none',
+          },
+          tabBarStyle: {
+            display: 'none',
+          },
         }}
       />
     </Tab.Navigator>

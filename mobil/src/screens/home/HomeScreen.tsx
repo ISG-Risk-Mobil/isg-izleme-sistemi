@@ -11,7 +11,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-
+import {useFocusEffect} from '@react-navigation/native';
 import {useAuth} from '../../context/AuthContext';
 import {getDevices} from '../../services/api/deviceService';
 import {
@@ -102,17 +102,24 @@ const HomeScreen = ({navigation}: any) => {
   };
 
   const fetchAdminPanelData = useCallback(async () => {
-    if (!token || !isAdmin) return;
+    if (!token || !isAdmin) {
+      setAdminUsers([]);
+      return;
+    }
 
     try {
       setAdminLoading(true);
 
       const usersResponse = await getUsers(token);
+
+      console.log('HOME ADMIN USERS RESPONSE:', usersResponse);
+
       const users = normalizeUsersResponse(usersResponse);
 
       setAdminUsers(users);
     } catch (error) {
-      console.log('ADMIN PANEL ERROR:', error);
+      console.log('HOME ADMIN PANEL ERROR:', error);
+      setAdminUsers([]);
     } finally {
       setAdminLoading(false);
     }
@@ -140,13 +147,15 @@ const HomeScreen = ({navigation}: any) => {
     }
   }, [token]);
 
-  useEffect(() => {
-    fetchActiveDevice();
+  useFocusEffect(
+    useCallback(() => {
+      fetchActiveDevice();
 
-    if (isAdmin) {
-      fetchAdminPanelData();
-    }
-  }, [fetchActiveDevice, fetchAdminPanelData, isAdmin]);
+      if (isAdmin) {
+        fetchAdminPanelData();
+      }
+    }, [fetchActiveDevice, fetchAdminPanelData, isAdmin]),
+  );
 
   const changeUserRole = async (
     targetUserId: string,
@@ -389,152 +398,98 @@ const HomeScreen = ({navigation}: any) => {
     );
   };
 
+  const handleOpenLocationMap = () => {
+    const deviceMongoId = activeDevice?._id || activeDevice?.id;
+
+    const initialLocation = lastSensorPayload?.location || null;
+
+    if (!deviceMongoId && !initialLocation) {
+      Alert.alert(
+        'Konum bulunamadı',
+        'Haritada göstermek için önce cihazdan konum verisi gelmeli.',
+      );
+      return;
+    }
+
+    navigation.navigate('Konum', {
+      deviceId: deviceMongoId,
+      deviceName: activeDevice?.name || 'Aktif Cihaz',
+      deviceCode: activeDevice?.deviceId || activeDevice?._id || '-',
+      initialLocation,
+      token,
+    });
+  };
+
   const renderAdminPanel = () => {
     if (!isAdmin) return null;
 
     return (
       <View style={styles.adminPanel}>
-        <View style={styles.adminPanelHeader}>
-          <View>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={styles.adminPanelHeader}
+          onPress={() => navigation.navigate('YonetimPaneli')}>
+          <View style={styles.adminPanelHeaderText}>
             <Text style={styles.adminPanelTitle}>Yönetim Paneli</Text>
 
             <Text style={styles.adminPanelSubTitle}>
-              Admin hesabı — kullanıcı yönetimi
+              Kullanıcı, cihaz ve alarm yönetimi
             </Text>
           </View>
 
-          <TouchableOpacity
-            style={styles.refreshButton}
-            onPress={fetchAdminPanelData}>
-            <Text style={styles.refreshButtonText}>Yenile</Text>
-          </TouchableOpacity>
-        </View>
+          <View style={styles.adminArrowBox}>
+            <Text style={styles.adminPanelArrow}>›</Text>
+          </View>
+        </TouchableOpacity>
 
         {adminLoading ? (
           <ActivityIndicator
             color="#F59E0B"
-            size="large"
+            size="small"
             style={styles.adminLoader}
           />
         ) : (
-          <>
-            <View style={styles.adminGrid}>
-              {renderAdminStatCard('Toplam Kullanıcı', adminUsers.length)}
-              {renderAdminStatCard('Worker', workerCount)}
-              {renderAdminStatCard('Admin', adminCount)}
+          <View style={styles.adminStatsRow}>
+            <View style={styles.adminStatBox}>
+              <Text style={styles.adminStatValue}>{adminUsers.length}</Text>
+              <Text style={styles.adminStatLabel}>Kullanıcı</Text>
             </View>
 
-            <View style={styles.adminUsersHeader}>
-              <Text style={styles.adminSectionTitle}>Kullanıcılar</Text>
+            <View style={styles.adminStatDivider} />
 
-              <Text style={styles.adminUserCountText}>
-                {adminUsers.length} kişi
-              </Text>
+            <View style={styles.adminStatBox}>
+              <Text style={styles.adminStatValue}>{workerCount}</Text>
+              <Text style={styles.adminStatLabel}>Worker</Text>
             </View>
 
-            {adminUsers.length === 0 ? (
-              <Text style={styles.adminEmptyText}>Kullanıcı bulunamadı.</Text>
-            ) : (
-              visibleAdminUsers.map((item, index) => {
-                const itemId = getUserId(item);
-                const currentUserId = getCurrentUserId();
-                const itemRole = item.role === 'admin' ? 'admin' : 'worker';
-                const nextRole = itemRole === 'worker' ? 'admin' : 'worker';
-                const isCurrentUser = itemId === currentUserId;
-                const isChanging = roleChangingUserId === itemId;
+            <View style={styles.adminStatDivider} />
 
-                return (
-                  <View key={itemId || index} style={styles.adminListCard}>
-                    <View style={styles.adminListLeft}>
-                      <View
-                        style={[
-                          styles.avatarCircle,
-                          itemRole === 'admin' && styles.adminAvatarCircle,
-                        ]}>
-                        <Text
-                          style={[
-                            styles.avatarText,
-                            itemRole === 'admin' && styles.adminAvatarText,
-                          ]}>
-                          {(item.name || '?').charAt(0).toUpperCase()}
-                        </Text>
-                      </View>
-
-                      <View style={styles.adminListInfo}>
-                        <Text style={styles.adminListTitle}>
-                          {item.name || 'İsimsiz Kullanıcı'}
-                        </Text>
-
-                        <Text style={styles.adminListSubText}>
-                          {item.email || 'E-posta yok'}
-                        </Text>
-
-                        <Text style={styles.adminListSubText}>
-                          Departman: {item.department || 'Genel'}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.adminListRight}>
-                      <View
-                        style={[
-                          styles.roleBadge,
-                          itemRole === 'admin'
-                            ? styles.adminRoleBadge
-                            : styles.workerRoleBadge,
-                        ]}>
-                        <Text style={styles.roleBadgeText}>{itemRole}</Text>
-                      </View>
-
-                      {!isCurrentUser && (
-                        <TouchableOpacity
-                          style={[
-                            styles.roleActionButton,
-                            nextRole === 'admin'
-                              ? styles.makeAdminButton
-                              : styles.makeWorkerButton,
-                            isChanging && styles.roleActionButtonDisabled,
-                          ]}
-                          disabled={isChanging}
-                          onPress={() => handleChangeUserRole(item)}>
-                          <Text
-                            style={[
-                              styles.roleActionButtonText,
-                              nextRole === 'admin'
-                                ? styles.makeAdminButtonText
-                                : styles.makeWorkerButtonText,
-                            ]}>
-                            {isChanging
-                              ? '...'
-                              : nextRole === 'admin'
-                              ? 'Admin Yap'
-                              : 'Worker Yap'}
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-
-                      {isCurrentUser && (
-                        <Text style={styles.currentUserText}>Sen</Text>
-                      )}
-                    </View>
-                  </View>
-                );
-              })
-            )}
-
-            {adminUsers.length > 2 && (
-              <TouchableOpacity
-                style={styles.adminViewAllButton}
-                onPress={() => setShowAllUsers(previous => !previous)}>
-                <Text style={styles.adminViewAllText}>
-                  {showAllUsers
-                    ? 'Daha az göster'
-                    : `Tüm kullanıcıları göster (${adminUsers.length})`}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </>
+            <View style={styles.adminStatBox}>
+              <Text style={styles.adminStatValue}>{adminCount}</Text>
+              <Text style={styles.adminStatLabel}>Admin</Text>
+            </View>
+          </View>
         )}
+
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={styles.adminMapButton}
+          onPress={handleOpenLocationMap}>
+          <View style={styles.adminMapIconBox}>
+            <Text style={styles.adminMapIcon}>⌖</Text>
+          </View>
+
+          <View style={styles.adminMapTextArea}>
+            <Text style={styles.adminMapTitle}>Konum Haritası</Text>
+            <Text style={styles.adminMapSubTitle}>
+              {activeDevice
+                ? `${activeDevice.name} konumunu görüntüle`
+                : 'Aktif cihaz konumu bekleniyor'}
+            </Text>
+          </View>
+
+          <Text style={styles.adminMapArrow}>›</Text>
+        </TouchableOpacity>
       </View>
     );
   };
@@ -566,7 +521,7 @@ const HomeScreen = ({navigation}: any) => {
           </View>
         </View>
 
-        {renderAdminPanel()}
+        <View style={styles.adminPanelSlot}>{renderAdminPanel()}</View>
 
         <View style={styles.deviceCard}>
           <Text style={styles.cardTitle}>Aktif Cihaz</Text>
@@ -626,10 +581,17 @@ const HomeScreen = ({navigation}: any) => {
           </View>
         </View>
 
-        <View style={styles.locationCard}>
-          <Text style={styles.cardTitle}>Son Konum</Text>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={styles.locationCard}
+          onPress={handleOpenLocationMap}>
+          <View style={styles.locationCardHeader}>
+            <Text style={styles.cardTitle}>Son Konum</Text>
+            <Text style={styles.locationOpenText}>Haritada Aç ›</Text>
+          </View>
+
           <Text style={styles.locationText}>{liveData.location}</Text>
-        </View>
+        </TouchableOpacity>
 
         <View style={styles.alertHeader}>
           <Text style={styles.sectionTitle}>Son Alarm Kayıtları</Text>
@@ -721,7 +683,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 25,
+    marginBottom: 12,
     marginTop: 10,
     gap: 12,
   },
@@ -767,35 +729,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 
-  adminPanel: {
-    backgroundColor: '#1E293B',
-    borderRadius: 22,
-    padding: 18,
-    marginBottom: 22,
-    borderWidth: 1,
-    borderColor: '#F59E0B',
-  },
-
-  adminPanelHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: 12,
-    marginBottom: 16,
-  },
-
-  adminPanelTitle: {
-    color: '#F59E0B',
-    fontSize: 22,
-    fontWeight: 'bold',
-  },
-
-  adminPanelSubTitle: {
-    color: '#CBD5E1',
-    fontSize: 13,
-    marginTop: 5,
-  },
-
   refreshButton: {
     backgroundColor: '#0F172A',
     borderRadius: 12,
@@ -809,10 +742,6 @@ const styles = StyleSheet.create({
     color: '#F59E0B',
     fontWeight: '700',
     fontSize: 12,
-  },
-
-  adminLoader: {
-    marginVertical: 20,
   },
 
   adminGrid: {
@@ -829,18 +758,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#334155',
-  },
-
-  adminStatLabel: {
-    color: '#94A3B8',
-    fontSize: 13,
-    marginBottom: 8,
-  },
-
-  adminStatValue: {
-    color: 'white',
-    fontSize: 26,
-    fontWeight: 'bold',
   },
 
   adminUsersHeader: {
@@ -1241,5 +1158,196 @@ const styles = StyleSheet.create({
     color: '#CBD5E1',
     fontWeight: '800',
     fontSize: 13,
+  },
+
+  adminCompactRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+
+  adminCompactItem: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 13,
+    backgroundColor: '#061B33',
+    borderWidth: 1,
+    borderColor: '#17314F',
+  },
+
+  adminCompactLabel: {
+    color: '#94A3B8',
+    fontSize: 10,
+    marginBottom: 5,
+  },
+
+  adminCompactValue: {
+    color: '#FFFFFF',
+    fontSize: 21,
+    fontWeight: '800',
+  },
+
+  adminHintText: {
+    color: '#94A3B8',
+    fontSize: 11,
+    marginTop: 10,
+  },
+
+  adminPanel: {
+    marginHorizontal: 23,
+    marginTop: 0,
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 18,
+    backgroundColor: '#1E2C3A',
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+
+  adminPanelSlot: {
+    marginTop: 18,
+    marginBottom: 18,
+  },
+
+  adminPanelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+
+  adminPanelHeaderText: {
+    flex: 1,
+    paddingRight: 10,
+  },
+
+  adminPanelTitle: {
+    color: '#F59E0B',
+    fontSize: 17,
+    fontWeight: '800',
+  },
+
+  adminPanelSubTitle: {
+    color: '#94A3B8',
+    fontSize: 11,
+    marginTop: 3,
+  },
+
+  adminArrowBox: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#061B33',
+  },
+
+  adminPanelArrow: {
+    color: '#F59E0B',
+    fontSize: 26,
+    fontWeight: '800',
+    marginTop: -3,
+  },
+
+  adminStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#061B33',
+    borderRadius: 13,
+    paddingVertical: 11,
+    paddingHorizontal: 6,
+    borderWidth: 1,
+    borderColor: '#17314F',
+  },
+
+  adminStatBox: {
+    flex: 1,
+    alignItems: 'center',
+  },
+
+  adminStatValue: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '800',
+  },
+
+  adminStatLabel: {
+    color: '#94A3B8',
+    fontSize: 10,
+    marginTop: 4,
+  },
+
+  adminStatDivider: {
+    width: 1,
+    height: 32,
+    backgroundColor: '#17314F',
+  },
+
+  adminLoader: {
+    marginVertical: 10,
+  },
+  adminMapButton: {
+    marginTop: 12,
+    backgroundColor: '#061B33',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#17314F',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+
+  adminMapIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#172554',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#2563EB',
+  },
+
+  adminMapIcon: {
+    color: '#60A5FA',
+    fontSize: 20,
+    fontWeight: '900',
+  },
+
+  adminMapTextArea: {
+    flex: 1,
+  },
+
+  adminMapTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+
+  adminMapSubTitle: {
+    color: '#94A3B8',
+    fontSize: 11,
+    marginTop: 3,
+  },
+
+  adminMapArrow: {
+    color: '#60A5FA',
+    fontSize: 24,
+    fontWeight: '900',
+  },
+
+  locationCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  locationOpenText: {
+    color: '#60A5FA',
+    fontSize: 12,
+    fontWeight: '800',
+    marginBottom: 12,
   },
 });
