@@ -74,11 +74,11 @@ Mobil uygulama, çalışanın cihazından **ivmeölçer**, **jiroskop**, **GPS k
 
 | Giriş | Ana Sayfa | Dashboard | Alarmlar |
 |---|---|---|---|
-| <img src="docs/screenshots/mobile-login.svg" alt="Mobil giriş ekranı" width="190" /> | <img src="docs/screenshots/mobile-home.svg" alt="Mobil ana ekran" width="190" /> | <img src="docs/screenshots/mobile-dashboard.svg" alt="Mobil dashboard" width="190" /> | <img src="docs/screenshots/mobile-alarms.svg" alt="Mobil alarmlar" width="190" /> |
+| <img src="docs/screenshots/mobile-login.jfif" alt="Mobil giriş ekranı" width="190" /> | <img src="docs/screenshots/mobile-home.jfif" alt="Mobil ana ekran" width="190" /> | <img src="docs/screenshots/mobile-dashboard.jfif" alt="Mobil dashboard" width="190" /> | <img src="docs/screenshots/mobile-alarms.jfif" alt="Mobil alarmlar" width="190" /> |
 
 | Konum / Harita |
 |---|
-| <img src="docs/screenshots/mobile-location.svg" alt="Mobil konum haritası" width="220" /> |
+| <img src="docs/screenshots/mobile-location.jfif" alt="Mobil konum haritası" width="220" /> |
 
 ---
 
