@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="docs/screenshots/btulogo.png" alt="Bursa Teknik Üniversitesi Logosu" width="200" />
+  <img src="docs/screenshots/btulogo.png" alt="Bursa Teknik Üniversitesi Logosu" width="250" />
 
   <h1>VisionGuard Pro</h1>
   <h3>İş Sağlığı ve Güvenliği İzleme Sistemi</h3>
