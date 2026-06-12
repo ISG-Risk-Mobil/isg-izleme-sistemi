@@ -88,6 +88,49 @@ Sistem üç ana uygulama katmanından ve bir veritabanı katmanından oluşur. W
 
 ```mermaid
 flowchart LR
+    subgraph MOBILE["Mobil Uygulama - React Native"]
+        M1["İvmeölçer"]
+        M2["Jiroskop"]
+        M3["GPS Konumu"]
+        M4["Batarya Bilgisi"]
+    end
+
+    subgraph WEB["Web Yönetim Paneli - React.js"]
+        W1["Dashboard"]
+        W2["Admin Paneli"]
+        W3["Canlı Grafikler"]
+        W4["Harita Görünümü"]
+    end
+
+    subgraph API["Backend API - Node.js / Express"]
+        A1["REST API"]
+        A2["JWT Auth"]
+        A3["RBAC Yetkilendirme"]
+        A4["Sensör Analiz Motoru"]
+        A5["Socket.io"]
+    end
+
+    subgraph DATABASE["Veritabanı Katmanı"]
+        DB1[("MongoDB")]
+        DB2["User"]
+        DB3["Device"]
+        DB4["SensorData"]
+        DB5["Alert"]
+        DB6["Risk"]
+    end
+
+    MOBILE -->|"Sensör Verisi / GPS / Batarya"| API
+    WEB -->|"REST API İstekleri"| API
+    API -->|"Canlı Veri Yayını"| WEB
+    API -->|"Veri Kaydı ve Sorgulama"| DATABASE
+
+    DB1 --> DB2
+    DB1 --> DB3
+    DB1 --> DB4
+    DB1 --> DB5
+    DB1 --> DB6
+```
+flowchart LR
     subgraph Mobile[React Native Mobil Uygulama]
         M1[İvmeölçer]
         M2[Jiroskop]
