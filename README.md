@@ -506,7 +506,7 @@ isg-izleme-sistemi/
 | 23360859076 | Büşra Yesin | Mobil Uygulama | [@busrayesinn](https://github.com/busrayesinn) |
 | 23360859078 | İsmihan Kırmızıoğlan | Backend API-Dokümantasyon | [@ismihankrmz](https://github.com/ismihankrmz) |
 | 22360859400 | Eda Şen | Veritabanı-Backend API-Dokümantasyon | [@EdaaSenn](https://github.com/EdaaSenn) |
-| 22360859017 | Melike Dal | Frontend | [@melikedal](https://github.com/melikedal) |
+| 22360859017 | Melike Dal | Web Panel (Frontend) | [@melikedal](https://github.com/melikedal) |
 
 ---
 
