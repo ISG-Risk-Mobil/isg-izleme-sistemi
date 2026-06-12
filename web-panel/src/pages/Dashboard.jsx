@@ -1,9 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { AlertTriangle, Activity, User, LogOut, ShieldCheck, Cpu, Users, BarChart2, FileText, LayoutDashboard, ChevronRight, Crown, UserX } from 'lucide-react';
 import { XAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import io from 'socket.io-client';
 import ProfilePage from './ProfilePage';
-import { KisiselKonum, KullaniciKonumModal } from './GpsComponents';
+import {
+  KisiselKonum,
+  KisiselKonumMobil,
+  KullaniciKonumModal
+} from './GpsComponents';
 
 function getRoleFromToken() {
   try {
@@ -31,25 +35,23 @@ export default function Dashboard({ role, onLogout, onBack }) {
   const [uyariMesaj, setUyariMesaj] = useState('');
   const grafikRengi = riskSkoru > 0.5 ? '#ef4444' : riskSkoru > 0.2 ? '#f59e0b' : '#22c55e';
 
-  // Kullanıcı detay state
+  
   const [secilenKullanici, setSecilenKullanici] = useState(null);
   const [kullaniciDetay, setKullaniciDetay] = useState(null);
   const [detayYukleniyor, setDetayYukleniyor] = useState(false);
-
-  // Alarm detay state — YENİ
   const [secilenAlarm, setSecilenAlarm] = useState(null);
-
-  // Cihaz detay state — YENİ
   const [secilenCihaz, setSecilenCihaz] = useState(null);
 
   const kullaniciRolu = getRoleFromToken();
   const mevcutKullaniciId = localStorage.getItem('userId');
   const isAdmin = kullaniciRolu === 'admin';
-
   
-  //const cozulmusAlarmlar = alarmlar.filter(a => a.resolved);
-  //const cozulmusTumAlarmlar = tumAlarmlar.filter(a => a.resolved);
-  //GPS için eklendi
+  const [aktifAlarmModalAcik, setAktifAlarmModalAcik] = useState(false);
+
+  const [kullaniciKonum, setKullaniciKonum] = useState(null);
+  
+  const [aramaKelimesi, setAramaKelimesi] = useState('');
+  
   const [modalSekme, setModalSekme] = useState('detay');
   const sekmeler = [
     { id: 'anaDashboard', label: 'Ana Panel', icon: <LayoutDashboard size={15}/> },
@@ -184,6 +186,20 @@ export default function Dashboard({ role, onLogout, onBack }) {
     }
   };
 
+  const fetchKullaniciKonum = useCallback(async () => {
+  try {
+    const res = await fetch('http://localhost:5000/api/auth/my-location', {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    });
+    const data = await res.json();
+    if (data.success && data.location) {
+      setKullaniciKonum(data.location); 
+    }
+  } catch (err) {
+    console.error('Kullanıcı konumu çekilemedi:', err);
+  }
+}, []);
+
   const alarmCoz = async (id) => {
 
   await fetch(
@@ -207,6 +223,7 @@ export default function Dashboard({ role, onLogout, onBack }) {
     fetchTumAlarmlar();
     fetchCihazlar();
     fetchRiskSkoru();
+    fetchKullaniciKonum();
   }, [isAdmin]);
   
   const aktifAlarmlar =
@@ -251,6 +268,12 @@ const cozulmusTumAlarmlar =
       const risk = yeniVeri.accelerometer?.magnitude || 0;
       setRiskSkoru(risk);
       setGrafikVerisi(prev => [...prev.slice(-19), { zaman: new Date().toLocaleTimeString('tr-TR').slice(0, 5), risk }]);
+      if (yeniVeri.location?.lat && yeniVeri.location?.lng) {
+    setKullaniciKonum({
+      lat: yeniVeri.location.lat,
+      lng: yeniVeri.location.lng
+    });
+  }
     });
     soket.on('new-alarm', (alarm) => {
       setAlarmlar(prev => [alarm, ...prev]);
@@ -263,7 +286,6 @@ const cozulmusTumAlarmlar =
     if (onLogout) onLogout(); else window.location.reload();
   };
 
-  // ── ALARM DETAY MODALI ──
   const AlarmDetayModal = () => {
     if (!secilenAlarm) return null;
     const a = secilenAlarm;
@@ -310,7 +332,99 @@ const cozulmusTumAlarmlar =
     );
   };
 
-  // ── CİHAZ DETAY MODALI ──
+  const AktifAlarmlarModal = () => {
+  if (!aktifAlarmModalAcik) return null;
+
+  return (
+    <div
+      style={styles.modal.overlay}
+      onClick={() => setAktifAlarmModalAcik(false)}
+    >
+      <div
+        style={styles.modal.box}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={styles.modal.baslik}>
+          <h2 style={{ margin: 0 }}>
+            Aktif Alarmlarım ({aktifAlarmlar.length})
+          </h2>
+
+          <button
+            onClick={() => setAktifAlarmModalAcik(false)}
+            style={styles.modal.kapatBtn}
+          >
+            ✕
+          </button>
+        </div>
+
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px',
+            maxHeight: '500px',
+            overflowY: 'auto'
+          }}
+        >
+          {aktifAlarmlar.length === 0 ? (
+            <p style={{ color: '#64748b' }}>
+              Aktif alarm bulunamadı.
+            </p>
+          ) : (
+            aktifAlarmlar.map((alarm) => (
+              <div
+                key={alarm._id}
+                onClick={() => setSecilenAlarm(alarm)}
+                style={{
+                  padding: '12px',
+                  backgroundColor: '#0f172a',
+                  borderRadius: '10px',
+                  borderLeft: '3px solid #ef4444',
+                  cursor: 'pointer'
+                }}
+              >
+                <p
+                  style={{
+                    margin: 0,
+                    color: '#e2e8f0',
+                    fontSize: '14px'
+                  }}
+                >
+                  {alarm.message}
+                </p>
+
+                <p
+                  style={{
+                    margin: '4px 0 0',
+                    color: '#64748b',
+                    fontSize: '12px'
+                  }}
+                >
+                  {new Date(alarm.createdAt).toLocaleString('tr-TR')}
+                </p>
+                
+<span style={{
+  display: 'inline-block',
+  marginTop: '6px',
+  padding: '2px 8px',
+  borderRadius: '4px',
+  fontSize: '11px',
+  fontWeight: '600',
+  backgroundColor: (alarm.isResolved === false || alarm.isResolved === "false") ? '#ef444422' : '#10b98122',
+  color: (alarm.isResolved === false || alarm.isResolved === "false") ? '#ef4444' : '#10b981',
+  border: `1px solid ${(alarm.isResolved === false || alarm.isResolved === "false") ? '#ef444444' : '#10b98144'}`
+}}>
+  {alarm.resolved === 'active' ? 'Aktif' : 'Çözüldü'}
+</span>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
   const CihazDetayModal = () => {
     if (!secilenCihaz) return null;
     const d = secilenCihaz;
@@ -368,20 +482,37 @@ const cozulmusTumAlarmlar =
         <span style={{ fontSize: '12px', color: '#64748b' }}>{localStorage.getItem('userName') || 'Kullanıcı'} · Son ölçüm</span>
       </div>
     </div>
-    <div style={{ ...styles.card, gridColumn: 'span 4' }}>
+      <div
+  style={{
+    ...styles.card,
+    gridColumn: 'span 4',
+    cursor: 'pointer'
+  }}
+  onClick={() => {
+     
+     setAktifAlarmModalAcik(true);
+     
+  }}
+>
       <p style={styles.title}><AlertTriangle size={14}/> Aktif Alarmlar</p>
       <div style={styles.statKart('#ef4444')}>
         <span style={{ fontSize: '32px', fontWeight: '700', color: '#ef4444' }}>{alarmlar.filter(a => !a.resolved).length}</span>
+
+        
         <span style={{ fontSize: '12px', color: '#64748b' }}>Çözülmemiş alarm</span>
       </div>
     </div>
     <div style={{ ...styles.card, gridColumn: 'span 4' }}>
-      <p style={styles.title}><ShieldCheck size={14}/> Sistem Durumu</p>
-      <div style={styles.statKart('#22c55e')}>
-        <span style={{ fontSize: '32px', fontWeight: '700', color: '#22c55e' }}>AKTİF</span>
-        <span style={{ fontSize: '12px', color: '#64748b' }}>Tüm sensörler bağlı</span>
-      </div>
-    </div>
+  <p style={styles.title}><ShieldCheck size={14}/> Sistem Durumu</p>
+  <div style={styles.statKart(aktifTumAlarmlar.length > 0 ? '#ef4444' : '#22c55e')}>
+    <span style={{ fontSize: '32px', fontWeight: '700', color: aktifTumAlarmlar.length > 0 ? '#ef4444' : '#22c55e' }}>
+      {aktifTumAlarmlar.length > 0 ? 'TEHLİKE' : 'GÜVENLİ'}
+    </span>
+    <span style={{ fontSize: '12px', color: '#64748b' }}>
+      {aktifTumAlarmlar.length > 0 ? `${aktifTumAlarmlar.length} aktif fabrika alarmı var` : 'Tüm sistemler normal'}
+    </span>
+  </div>
+</div>
     <div style={{ ...styles.card, gridColumn: 'span 8' }}>
       <p style={styles.title}><Activity size={14}/> Canlı Risk Analizi</p>
       <ResponsiveContainer width="100%" height={200}>
@@ -399,7 +530,6 @@ const cozulmusTumAlarmlar =
       </ResponsiveContainer>
     </div>
 
-    {/* ÇÖZÜLMÜŞ ALARMLARIM KARTI */}
     <div style={{ ...styles.card, gridColumn: 'span 4' }}>
       <p style={styles.title}><ShieldCheck size={14}/> Çözülmüş Alarmlarım</p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto' }}>
@@ -419,7 +549,8 @@ const cozulmusTumAlarmlar =
       </div>
     </div>
 
-    <KisiselKonum styles={styles} />
+    
+<KisiselKonumMobil styles={styles} />
   </div>
 );
 
@@ -472,12 +603,12 @@ const cozulmusTumAlarmlar =
   );
 
   const YonetimPaneli = () => (
-    
-  
+
     <div style={styles.grid}>
       <div style={{ ...styles.card, gridColumn: 'span 12', border: '1px solid #f59e0b', background: 'linear-gradient(135deg, #1e293b 0%, #1a2535 100%)' }}>
         <p style={{ ...styles.title, color: '#f59e0b', marginBottom: 0 }}><Users size={14}/> Yönetici Kontrol Paneli — Tüm fabrika sahası izleniyor</p>
       </div>
+
       <div style={{ ...styles.card, gridColumn: 'span 8' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
           <p style={{ ...styles.title, marginBottom: 0 }}><Users size={14}/> Kullanıcılar</p>
@@ -531,7 +662,7 @@ const cozulmusTumAlarmlar =
           ))}
         </div>
       </div>
-      {/* AKTİF FABRİKA ALARMLARI */}
+      
 <div style={{ ...styles.card, gridColumn: 'span 6' }}>
   <p style={styles.title}>
     <AlertTriangle size={14}/>
@@ -637,7 +768,7 @@ const cozulmusTumAlarmlar =
   </div>
 </div>
 
-{/* ÇÖZÜLMÜŞ FABRİKA ALARMLARI */}
+
 <div style={{ ...styles.card, gridColumn: 'span 6' }}>
   <p style={styles.title}>
     <ShieldCheck size={14}/>
@@ -726,14 +857,15 @@ const cozulmusTumAlarmlar =
   }
 
   return (
+    
     <div style={styles.container}>
 
-      {/* KULLANICI DETAY MODALI */}
+      
 {secilenKullanici && (
   <div style={styles.modal.overlay} onClick={() => { setSecilenKullanici(null); setModalSekme('detay'); }}>
     <div style={{ ...styles.modal.box, width: '600px' }} onClick={e => e.stopPropagation()}>
 
-      {/* Başlık */}
+      
       <div style={styles.modal.baslik}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           <div style={{ width: '50px', height: '50px', borderRadius: '50%', backgroundColor: secilenKullanici.role === 'admin' ? '#f59e0b20' : '#334155', display: 'flex', alignItems: 'center', justifyContent: 'center', border: secilenKullanici.role === 'admin' ? '2px solid #f59e0b40' : '2px solid #334155' }}>
@@ -747,7 +879,6 @@ const cozulmusTumAlarmlar =
         <button onClick={() => { setSecilenKullanici(null); setModalSekme('detay'); }} style={styles.modal.kapatBtn}>✕</button>
       </div>
 
-      {/* Sekme Butonları */}
       <div style={{ display: 'flex', gap: '6px', marginBottom: '20px', backgroundColor: '#0f172a', padding: '5px', borderRadius: '10px', border: '1px solid #1e293b' }}>
         {[
           { id: 'detay', label: '👤 Detay' },
@@ -770,7 +901,7 @@ const cozulmusTumAlarmlar =
         ))}
       </div>
 
-      {/* ── DETAY SEKMESİ ── */}
+    
       {modalSekme === 'detay' && (
         <>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
@@ -826,7 +957,7 @@ const cozulmusTumAlarmlar =
         </>
       )}
 
-      {/* ── GPS SEKMESİ ── */}
+     
       {modalSekme === 'konum' && (
         <KullaniciKonumModal kullanici={secilenKullanici} />
       )}
@@ -836,17 +967,20 @@ const cozulmusTumAlarmlar =
 )}
 
 
-      {/* ALARM DETAY MODALI */}
+      
       <AlarmDetayModal/>
 
-      {/* CİHAZ DETAY MODALI */}
+      
       <CihazDetayModal/>
+
+      <AktifAlarmlarModal />
 
       <header style={styles.header}>
         <div>
           <h1 style={{ margin: 0, fontSize: '22px', fontWeight: '700' }}>VisionGuard <span style={{ color: '#f59e0b' }}>Pro</span></h1>
           {isAdmin && <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#f59e0b' }}>Yönetici Görünümü</p>}
         </div>
+
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <button style={styles.profileBtn} onClick={() => setGosterimModu('PROFILE')}><User size={16}/> Profilim</button>
           <button style={{ ...styles.profileBtn, borderColor: '#ef4444', color: '#ef4444' }} onClick={handleLogout}><LogOut size={16}/> Çıkış</button>

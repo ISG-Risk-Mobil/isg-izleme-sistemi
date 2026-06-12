@@ -1,74 +1,3 @@
-/*const express = require('express');
-const router = express.Router();
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
-const User = require('../models/User');
-const { protect } = require('../middleware/auth');
-
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRE
-  });
-};
-
-router.post('/register', async (req, res) => {
-  try {
-    const { name, email, password, role, department } = req.body;
-    
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ success: false, message: 'Bu email zaten kayıtlı' });
-    }
-
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    const user = await User.create({ 
-      name, email, 
-      password: hashedPassword, 
-      role, department 
-    });
-
-    const token = generateToken(user._id);
-    res.status(201).json({ 
-      success: true, token, 
-      user: { id: user._id, name: user.name, email: user.email, role: user.role }
-    });
-  } catch (err) {
-    res.status(400).json({ success: false, message: err.message });
-  }
-});
-
-router.post('/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ success: false, message: 'Email ve sifre zorunludur' });
-    }
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(401).json({ success: false, message: 'Gecersiz email veya sifre' });
-    }
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(401).json({ success: false, message: 'Gecersiz email veya sifre' });
-    }
-    const token = generateToken(user._id);
-    res.json({ 
-      success: true, token, 
-      user: { id: user._id, name: user.name, email: user.email, role: user.role }
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-router.get('/me', protect, async (req, res) => {
-  res.json({ success: true, user: req.user });
-});
-
-module.exports = router;*/
-
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
@@ -77,7 +6,6 @@ const User = require('../models/User');
 const Device = require('../models/Device');
 const { protect } = require('../middleware/auth');
 
-// role'ü de token'a göm
 const generateToken = (id, role) => {
   return jwt.sign(
     { id, role },
@@ -86,7 +14,6 @@ const generateToken = (id, role) => {
   );
 };
 
-// Admin middleware
 const adminOnly = (req, res, next) => {
   if (req.user.role !== 'admin') {
     return res.status(403).json({ success: false, message: 'Yetkisiz: Sadece adminler erişebilir' });
@@ -147,7 +74,6 @@ router.get('/me', protect, async (req, res) => {
   res.json({ success: true, user: req.user });
 });
 
-// Kullanıcı listesi — sadece admin
 router.get('/users', protect, adminOnly, async (req, res) => {
   try {
     const users = await User.find().select('-password');
@@ -157,7 +83,6 @@ router.get('/users', protect, adminOnly, async (req, res) => {
   }
 });
 
-// Rol değiştir — admin yap
 router.put('/users/:id/make-admin', protect, adminOnly, async (req, res) => {
   try {
     const user = await User.findByIdAndUpdate(
@@ -172,7 +97,6 @@ router.put('/users/:id/make-admin', protect, adminOnly, async (req, res) => {
   }
 });
 
-// Rol değiştir — worker yap
 router.put('/users/:id/make-worker', protect, adminOnly, async (req, res) => {
   try {
     const user = await User.findByIdAndUpdate(
@@ -187,7 +111,6 @@ router.put('/users/:id/make-worker', protect, adminOnly, async (req, res) => {
   }
 });
 
-// Şifremi Unuttum
 router.post('/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
@@ -206,7 +129,6 @@ router.post('/forgot-password', async (req, res) => {
   }
 });
 
-// Şifre Sıfırla
 router.post('/reset-password', async (req, res) => {
   try {
     const { resetToken, newPassword } = req.body;
@@ -230,7 +152,6 @@ router.post('/reset-password', async (req, res) => {
   }
 });
 
-// Şifre Değiştir
 router.put('/change-password', protect, async (req, res) => {
   try {
     const { oldPassword, newPassword } = req.body;
@@ -251,7 +172,6 @@ router.put('/change-password', protect, async (req, res) => {
   }
 });
 
-// Cihaz listesi
 router.get('/devices', protect, async (req, res) => {
   try {
     const devices = await Device.find().populate('assignedUser', 'name email');
@@ -261,7 +181,6 @@ router.get('/devices', protect, async (req, res) => {
   }
 });
 
-// Alarmlar — personel kendi alarmlarını, admin tümünü görür
 router.get('/alerts', protect, async (req, res) => {
   try {
     const Alarm = require('../models/Alarm');
@@ -279,36 +198,15 @@ router.get('/alerts', protect, async (req, res) => {
   }
 });
 
-/*router.get('/my-sensor', protect, async (req, res) => {
-  try {
-    const Device = require('../models/Device');
-    const SensorLog = require('../models/SensorLog');
-    
-    const device = await Device.findOne({ assignedUser: req.user._id });
-    if (!device) {
-      return res.json({ success: true, log: null });
-    }
-    
-    const log = await SensorLog.findOne({ deviceId: device._id })
-      .sort({ timestamp: -1 });
-    
-    res.json({ success: true, log });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-*/
-
 router.get('/my-sensor', protect, async (req, res) => {
   try {
     const Device = require('../models/Device');
     const SensorLog = require('../models/SensorLog');
     const Alarm = require('../models/Alarm');
 
-    // Önce assignedUser ile ara
+    
     let device = await Device.findOne({ assignedUser: req.user._id });
 
-    // Bulamazsan kullanıcının alarmlarındaki deviceId'yi kullan
     if (!device) {
       const lastAlarm = await Alarm.findOne({ userId: req.user._id }).sort({ createdAt: -1 });
       if (lastAlarm) {
@@ -320,7 +218,7 @@ router.get('/my-sensor', protect, async (req, res) => {
 
     const logs = await SensorLog.find({ deviceId: device._id })
       .sort({ timestamp: -1 })
-       // .limit(20) ← bunu sil
+       
 
     res.json({ success: true, logs: logs.reverse() });
   } catch (err) {
@@ -328,7 +226,6 @@ router.get('/my-sensor', protect, async (req, res) => {
   }
 });
 
-//ÇÖZÜLMÜŞ ALARM ENDPOİNTİ eklendi
 router.put('/alarms/:id/resolve', async (req, res) => {
 
   const alarm = await Alarm.findByIdAndUpdate(
@@ -346,5 +243,28 @@ router.put('/alarms/:id/resolve', async (req, res) => {
     alarm
   });
 
+});
+
+router.get('/my-location', protect, async (req, res) => {
+  try {
+    
+    const SensorLog = require('../models/SensorLog');
+    const sonKonumLogu = await SensorLog.findOne({ userId: req.user._id })
+                                        .sort({ timestamp: -1 });
+
+    if (!sonKonumLogu || !sonKonumLogu.location) {
+      return res.json({ success: false, message: "Konum kaydı bulunamadı." });
+    }
+
+    res.json({ 
+      success: true, 
+      location: {
+        lat: sonKonumLogu.location.lat,
+        lng: sonKonumLogu.location.lng
+      } 
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 module.exports = router;

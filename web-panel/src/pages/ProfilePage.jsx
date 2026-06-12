@@ -16,8 +16,6 @@ export default function ProfilSayfasi({ kullanici = {}, geriDon }) {
     department: kullanici?.department || localStorage.getItem('userDept')  || '',
   });
 
-
-  // ← Eksik olan state burası
   const [sifreBilgileri, setSifreBilgileri] = useState({
     eskiSifre: '', yeniSifre: '', yeniSifreTekrar: ''
   });
@@ -50,7 +48,6 @@ export default function ProfilSayfasi({ kullanici = {}, geriDon }) {
     gosterBildirim("Profil bilgileri kaydedildi!");
   };
 
-  // ← Eksik olan fonksiyon burası
   const sifreGuncellemeIstegi = async () => {
     const { eskiSifre, yeniSifre, yeniSifreTekrar } = sifreBilgileri;
 
@@ -101,7 +98,7 @@ export default function ProfilSayfasi({ kullanici = {}, geriDon }) {
 
   return (
     <div style={stiller.konteyner}>
-      {/* Bildirim */}
+
       {mesaj && (
         <div style={{ position: 'fixed', top: '20px', right: '20px', backgroundColor: mesajTip === 'hata' ? '#dc2626' : '#059669', color: 'white', padding: '15px 20px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '10px', zIndex: 1000 }}>
           <CheckCircle size={18}/> {mesaj}
@@ -115,7 +112,7 @@ export default function ProfilSayfasi({ kullanici = {}, geriDon }) {
       </button>
 
       <div style={stiller.anaKart}>
-        {/* SOL PANEL */}
+        
         <div style={stiller.solPanel}>
           <img
             src={profilFotografi || `https://ui-avatars.com/api/?name=${encodeURIComponent(formData.name || 'U')}&background=334155&color=f8fafc`}
@@ -148,7 +145,7 @@ export default function ProfilSayfasi({ kullanici = {}, geriDon }) {
           </div>
         </div>
 
-        {/* SAĞ PANEL */}
+        
         <div style={stiller.sagPanel}>
           {!sifreDegistiriliyorMu ? (
             <>

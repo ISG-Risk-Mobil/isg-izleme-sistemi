@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MapPin, Navigation, RefreshCw, Wifi, WifiOff } from 'lucide-react';
 
-// ── Ortak: Leaflet CDN yükle ──────────────────────────────
 function leafletYukle() {
   return new Promise((resolve) => {
     if (window.L) { resolve(); return; }
@@ -33,11 +32,6 @@ const HARITA_CSS = `
   @keyframes gps-spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
 `;
 
-
-// ══════════════════════════════════════════════════════════
-//  KisiselKonum — Ana Panel'de kişinin kendi konumu
-//  Kullanım: <KisiselKonum styles={styles} />
-// ══════════════════════════════════════════════════════════
 export function KisiselKonum({ styles }) {
   const mapRef        = useRef(null);
   const leafletMapRef = useRef(null);
@@ -68,12 +62,13 @@ export function KisiselKonum({ styles }) {
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
 
     const ikon = L.divIcon({
-      className: '',
-      html: `<div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#f59e0b,#ef4444);border:3px solid #fff;box-shadow:0 0 0 4px rgba(245,158,11,0.3),0 4px 16px rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;animation:gps-pulse 2s infinite">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
-      </div>`,
-      iconSize: [40, 40], iconAnchor: [20, 40],
-    });
+  className: '',
+  html: `<div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#f59e0b,#ef4444);border:3px solid #fff;box-shadow:0 0 0 4px rgba(245,158,11,0.3),0 4px 16px rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;animation:gps-pulse 2s infinite">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+  </div>`,
+  iconSize: [40, 40], 
+  iconAnchor: [20, 20],
+});
 
     const marker = L.marker([lat, lng], { icon: ikon })
       .addTo(map)
@@ -175,24 +170,6 @@ export function KisiselKonum({ styles }) {
   );
 }
 
-
-// ══════════════════════════════════════════════════════════
-//  KullaniciKonumModal — Yönetim paneli kullanıcı modalı içinde
-//
-//  MongoDB'den gelen format: { latitude, longitude, accuracy }
-//
-//  Dashboard.jsx'te kullanıcı detay modalına sekme olarak ekle:
-//
-//  1) State ekle:
-//     const [modalSekme, setModalSekme] = useState('detay');
-//
-//  2) secilenKullanici null yapılan yerlere ekle:
-//     setModalSekme('detay');
-//
-//  3) Modal başlığından sonra sekme butonları ekle (aşağıda gösterildi)
-//
-//  4) Modal içeriğini koşullu göster (aşağıda gösterildi)
-// ══════════════════════════════════════════════════════════
 export function KullaniciKonumModal({ kullanici }) {
   const mapRef        = useRef(null);
   const leafletMapRef = useRef(null);
@@ -204,7 +181,7 @@ export function KullaniciKonumModal({ kullanici }) {
   const konumCek = async () => {
     setYukleniyor(true); setHata(null);
     try {
-      // sensorData.js'e eklediğimiz endpoint'i çağır
+      
       const res = await fetch(
         `http://localhost:5000/api/sensor-data/user-location/${kullanici._id}`,
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
@@ -215,7 +192,6 @@ export function KullaniciKonumModal({ kullanici }) {
         throw new Error(data.message || 'Konum verisi alınamadı');
       }
 
-      // MongoDB'den gelen format: { latitude, longitude, accuracy }
       const { latitude, longitude, accuracy } = data.location;
 
       if (!latitude || !longitude) {
@@ -282,16 +258,24 @@ export function KullaniciKonumModal({ kullanici }) {
   }, [kullanici._id]);
 
   useEffect(() => {
-    if (konum && !yukleniyor) {
-      setTimeout(() => haritaOlustur(konum.lat, konum.lng, konum.accuracy), 80);
-    }
-  }, [konum, yukleniyor]);
+  if (konum && !yukleniyor) {
+    
+    const timer = setTimeout(() => {
+      haritaOlustur(konum.lat, konum.lng, konum.accuracy);
+      
+      if (leafletMapRef.current) {
+        leafletMapRef.current.invalidateSize();
+      }
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }
+}, [konum, yukleniyor]);
 
   return (
     <div>
       <style>{HARITA_CSS}</style>
 
-      {/* Yükleniyor */}
       {yukleniyor && (
         <div style={{ height: '300px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '14px', backgroundColor: '#0f172a', borderRadius: '12px' }}>
           <Navigation size={30} color="#f59e0b" style={{ animation: 'gps-spin 1.5s linear infinite' }} />
@@ -299,7 +283,6 @@ export function KullaniciKonumModal({ kullanici }) {
         </div>
       )}
 
-      {/* Hata */}
       {!yukleniyor && hata && (
         <div style={{ height: '260px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', backgroundColor: '#0f172a', borderRadius: '12px', border: '1px solid #ef444430' }}>
           <WifiOff size={32} color="#ef4444" />
@@ -311,7 +294,6 @@ export function KullaniciKonumModal({ kullanici }) {
         </div>
       )}
 
-      {/* Harita + Bilgi kartları */}
       {!yukleniyor && !hata && konum && (
         <>
           <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid #334155', marginBottom: '12px' }}>
@@ -346,11 +328,6 @@ export function KullaniciKonumModal({ kullanici }) {
   );
 }
 
-
-// ══════════════════════════════════════════════════════════
-//  KisiselKonumMobil — Ana Panel'de mobilden gelen konum
-//  Kullanım: <KisiselKonumMobil styles={styles} />
-// ══════════════════════════════════════════════════════════
 export function KisiselKonumMobil({ styles }) {
   const mapRef        = useRef(null);
   const leafletMapRef = useRef(null);
@@ -400,12 +377,13 @@ export function KisiselKonumMobil({ styles }) {
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
 
     const ikon = L.divIcon({
-      className: '',
-      html: `<div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#f59e0b,#ef4444);border:3px solid #fff;box-shadow:0 0 0 4px rgba(245,158,11,0.3),0 4px 16px rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;animation:gps-pulse 2s infinite">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
-      </div>`,
-      iconSize: [40, 40], iconAnchor: [20, 40],
-    });
+  className: '',
+  html: `<div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#f59e0b,#ef4444);border:3px solid #fff;box-shadow:0 0 0 4px rgba(245,158,11,0.3),0 4px 16px rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;animation:gps-pulse 2s infinite">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+  </div>`,
+  iconSize: [40, 40], 
+  iconAnchor: [20, 20], 
+});
 
     L.marker([lat, lng], { icon: ikon })
       .addTo(map)
@@ -421,7 +399,6 @@ export function KisiselKonumMobil({ styles }) {
 
   useEffect(() => {
     konumCek();
-    // Her 30 saniyede otomatik yenile
     const interval = setInterval(konumCek, 30000);
     return () => {
       clearInterval(interval);
@@ -439,7 +416,7 @@ export function KisiselKonumMobil({ styles }) {
     <div style={{ ...styles.card, gridColumn: 'span 12' }}>
       <style>{HARITA_CSS}</style>
 
-      {/* Başlık */}
+      
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <p style={{ ...styles.title, marginBottom: 0 }}>
           <MapPin size={14} color="#f59e0b" /> Anlık Konumum
@@ -461,7 +438,6 @@ export function KisiselKonumMobil({ styles }) {
         </div>
       </div>
 
-      {/* Yükleniyor */}
       {yukleniyor && (
         <div style={{ height: '300px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '14px', backgroundColor: '#0f172a', borderRadius: '12px', border: '1px solid #334155' }}>
           <Navigation size={30} color="#f59e0b" style={{ animation: 'gps-spin 1.5s linear infinite' }} />
@@ -469,7 +445,6 @@ export function KisiselKonumMobil({ styles }) {
         </div>
       )}
 
-      {/* Hata */}
       {!yukleniyor && hata && (
         <div style={{ height: '260px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', backgroundColor: '#0f172a', borderRadius: '12px', border: '1px solid #ef444430' }}>
           <WifiOff size={32} color="#ef4444" />
@@ -481,14 +456,12 @@ export function KisiselKonumMobil({ styles }) {
         </div>
       )}
 
-      {/* Harita */}
       {!yukleniyor && !hata && konum && (
         <>
           <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid #334155', marginBottom: '12px' }}>
             <div ref={mapRef} style={{ height: '300px', width: '100%' }} />
           </div>
 
-          {/* Koordinat kartları */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
             {[
               { label: 'Enlem',          value: konum.lat.toFixed(6) + '°',  renk: '#6366f1' },
