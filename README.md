@@ -34,7 +34,7 @@
 - [Kurulum ve Çalıştırma](#kurulum-ve-çalıştırma)
 - [Proje Klasör Yapısı](#proje-klasör-yapısı)
 - [Güvenlik Mimarisi](#güvenlik-mimarisi)
-- [Ekip](#ekip)
+- [Ekip ve Görev Dağılımı](#ekip)
 
 ---
 
@@ -499,14 +499,14 @@ isg-izleme-sistemi/
 
 ---
 
-## Ekip
+## Ekip ve Görev Dağılımı
 
-| Öğrenci No | Ad Soyad | GitHub Profili |
-|---|---|---|
-| 23360859076 | Büşra Yesin | [@busrayesinn](https://github.com/busrayesinn) |
-| 23360859078 | İsmihan Kırmızıoğlan | [@ismihankrmz](https://github.com/ismihankrmz) |
-| 22360859400 | Eda Şen | [@EdaaSenn](https://github.com/EdaaSenn)|
-| 22360859017 | Melike Dal | [@melikedal](https://github.com/melikedal) |
+| Öğrenci No | Ad Soyad | Görev Alanı | GitHub Profili |
+|---|---|---|---|
+| 23360859076 | Büşra Yesin | Mobil Uygulama | [@busrayesinn](https://github.com/busrayesinn) |
+| 23360859078 | İsmihan Kırmızıoğlan | Backend API | [@ismihankrmz](https://github.com/ismihankrmz) |
+| 22360859400 | Eda Şen | Veritabanı | [@EdaaSenn](https://github.com/EdaaSenn) |
+| 22360859017 | Melike Dal | Frontend | [@melikedal](https://github.com/melikedal) |
 
 ---
 
