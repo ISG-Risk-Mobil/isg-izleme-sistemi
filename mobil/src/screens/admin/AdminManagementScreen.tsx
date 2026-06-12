@@ -384,7 +384,121 @@ const AdminManagementScreen = ({navigation}: any) => {
   const getDeviceOwnerName = (device: any) => {
     return device?.assignedUser?.name || 'Atanmamış';
   };
+  const toNumber = (value: any) => {
+    if (value === null || value === undefined || value === '') {
+      return null;
+    }
 
+    const numberValue = Number(value);
+    return Number.isFinite(numberValue) ? numberValue : null;
+  };
+
+  const normalizeLocation = (source: any) => {
+    const raw =
+      source?.location ||
+      source?.lastLocation ||
+      source?.lastKnownLocation ||
+      source?.sensorData?.location ||
+      source?.sensorData?.triggerData?.location ||
+      source?.triggerData?.location ||
+      null;
+
+    if (!raw || typeof raw !== 'object') {
+      return null;
+    }
+
+    const latitude = toNumber(raw.latitude ?? raw.lat);
+    const longitude = toNumber(raw.longitude ?? raw.lng ?? raw.lon);
+    const accuracy = toNumber(raw.accuracy);
+
+    if (latitude === null || longitude === null) {
+      return null;
+    }
+
+    return {
+      latitude,
+      longitude,
+      accuracy,
+      timestamp:
+        raw.timestamp ||
+        source?.timestamp ||
+        source?.createdAt ||
+        source?.lastSeen ||
+        source?.updatedAt ||
+        null,
+    };
+  };
+
+  const getLocationText = (location: any) => {
+    if (!location) {
+      return 'Konum verisi yok';
+    }
+
+    return `${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`;
+  };
+
+  const openLocationScreen = (params: any) => {
+    setSelectedAlarm(null);
+    setSelectedDevice(null);
+
+    setTimeout(() => {
+      navigation.navigate('Konum', params);
+    }, 120);
+  };
+
+  const handleOpenAlarmLocation = (alarm: any) => {
+    const alarmLocation = normalizeLocation(alarm);
+    const alarmDevice = alarm?.deviceId;
+
+    const deviceMongoId = getAlarmDeviceId(alarm);
+
+    const deviceName =
+      typeof alarmDevice === 'object'
+        ? alarmDevice?.name || alarmDevice?.deviceId || 'Alarm Cihazı'
+        : 'Alarm Cihazı';
+
+    const deviceCode =
+      typeof alarmDevice === 'object'
+        ? alarmDevice?.deviceId || alarmDevice?._id || '-'
+        : alarmDevice || '-';
+
+    if (!deviceMongoId && !alarmLocation) {
+      Alert.alert(
+        'Konum bulunamadı',
+        'Bu alarm için haritada gösterilecek konum verisi yok.',
+      );
+      return;
+    }
+
+    openLocationScreen({
+      deviceId: deviceMongoId,
+      deviceName,
+      deviceCode,
+      initialLocation: alarmLocation,
+      token,
+    });
+  };
+
+  const handleOpenDeviceLocation = (device: any) => {
+    const deviceLocation = normalizeLocation(device);
+    const deviceMongoId = getId(device);
+
+    if (!deviceMongoId && !deviceLocation) {
+      Alert.alert(
+        'Konum bulunamadı',
+        'Bu cihaz için haritada gösterilecek konum verisi yok.',
+      );
+      return;
+    }
+
+    openLocationScreen({
+      deviceId: deviceMongoId,
+      deviceName: device?.name || 'Cihaz Konumu',
+      deviceCode: device?.deviceId || device?._id || '-',
+      initialLocation: deviceLocation,
+      token,
+    });
+  };
   const getSeverityStyle = (severity: string) => {
     if (severity === 'CRITICAL') {
       return styles.criticalBadge;
@@ -721,61 +835,80 @@ const AdminManagementScreen = ({navigation}: any) => {
       return <Text style={styles.emptyText}>Alarm kaydı bulunamadı.</Text>;
     }
 
-    return filteredAlarms.map((alarm, index) => (
-      <TouchableOpacity
-        key={alarm._id || alarm.id || index}
-        activeOpacity={0.85}
-        style={styles.alarmCard}
-        onPress={() => setSelectedAlarm(alarm)}>
-        <View style={styles.alarmTop}>
-          <Text style={styles.listTitle}>{alarm.type || 'Alarm'}</Text>
+    return filteredAlarms.map((alarm, index) => {
+      const alarmLocation = normalizeLocation(alarm);
 
-          <View
-            style={[styles.severityBadge, getSeverityStyle(alarm.severity)]}>
-            <Text style={styles.badgeText}>{alarm.severity || 'LOW'}</Text>
+      return (
+        <TouchableOpacity
+          key={alarm._id || alarm.id || index}
+          activeOpacity={0.85}
+          style={styles.alarmCard}
+          onPress={() => setSelectedAlarm(alarm)}>
+          <View style={styles.alarmTop}>
+            <Text style={styles.listTitle}>{alarm.type || 'Alarm'}</Text>
+
+            <View
+              style={[styles.severityBadge, getSeverityStyle(alarm.severity)]}>
+              <Text style={styles.badgeText}>{alarm.severity || 'LOW'}</Text>
+            </View>
           </View>
-        </View>
 
-        <Text style={styles.listSubText}>
-          {alarm.description || 'Açıklama yok'}
-        </Text>
-
-        <Text style={styles.listSubText}>
-          Kullanıcı: {getAlarmUserName(alarm)}
-        </Text>
-
-        <Text style={styles.listSubText}>
-          Cihaz: {getAlarmDeviceName(alarm)}
-        </Text>
-
-        <Text style={styles.dateText}>{formatDate(alarm.createdAt)}</Text>
-
-        {alarm.resolved && (
           <Text style={styles.listSubText}>
-            Çözen yönetici: {getResolvedByName(alarm)}
-          </Text>
-        )}
-
-        <View style={styles.alarmBottom}>
-          <Text
-            style={
-              alarm.resolved ? styles.resolvedText : styles.unresolvedText
-            }>
-            {alarm.resolved ? 'Çözüldü' : 'Aktif'}
+            {alarm.description || 'Açıklama yok'}
           </Text>
 
-          {!alarm.resolved && (
-            <TouchableOpacity
-              style={styles.resolveButton}
-              onPress={() => handleResolveAlarm(alarm._id || alarm.id)}>
-              <Text style={styles.resolveButtonText}>Çöz</Text>
-            </TouchableOpacity>
+          <Text style={styles.listSubText}>
+            Kullanıcı: {getAlarmUserName(alarm)}
+          </Text>
+
+          <Text style={styles.listSubText}>
+            Cihaz: {getAlarmDeviceName(alarm)}
+          </Text>
+
+          <Text style={styles.listSubText}>
+            Konum:{' '}
+            {alarmLocation
+              ? getLocationText(alarmLocation)
+              : 'Haritadan kontrol et'}
+          </Text>
+
+          <Text style={styles.dateText}>{formatDate(alarm.createdAt)}</Text>
+
+          {alarm.resolved && (
+            <Text style={styles.listSubText}>
+              Çözen yönetici: {getResolvedByName(alarm)}
+            </Text>
           )}
-        </View>
 
-        <Text style={styles.tapHint}>Detay için dokun</Text>
-      </TouchableOpacity>
-    ));
+          <View style={styles.alarmBottom}>
+            <Text
+              style={
+                alarm.resolved ? styles.resolvedText : styles.unresolvedText
+              }>
+              {alarm.resolved ? 'Çözüldü' : 'Aktif'}
+            </Text>
+
+            <View style={styles.alarmActionGroup}>
+              <TouchableOpacity
+                style={styles.mapMiniButton}
+                onPress={() => handleOpenAlarmLocation(alarm)}>
+                <Text style={styles.mapMiniButtonText}>Harita</Text>
+              </TouchableOpacity>
+
+              {!alarm.resolved && (
+                <TouchableOpacity
+                  style={styles.resolveButton}
+                  onPress={() => handleResolveAlarm(alarm._id || alarm.id)}>
+                  <Text style={styles.resolveButtonText}>Çöz</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          <Text style={styles.tapHint}>Detay için dokun</Text>
+        </TouchableOpacity>
+      );
+    });
   };
 
   const renderDevices = () => {
@@ -783,43 +916,68 @@ const AdminManagementScreen = ({navigation}: any) => {
       return <Text style={styles.emptyText}>Cihaz bulunamadı.</Text>;
     }
 
-    return filteredDevices.map((device, index) => (
-      <TouchableOpacity
-        key={device._id || device.id || device.deviceId || index}
-        activeOpacity={0.85}
-        style={styles.listCard}
-        onPress={() => setSelectedDevice(device)}>
-        <View style={styles.listInfo}>
-          <Text style={styles.listTitle}>{device.name || 'İsimsiz Cihaz'}</Text>
+    return filteredDevices.map((device, index) => {
+      const deviceLocation = normalizeLocation(device);
 
-          <Text style={styles.listSubText}>
-            Cihaz ID: {device.deviceId || '-'}
-          </Text>
-
-          <Text style={styles.listSubText}>
-            Kullanıcı: {getDeviceOwnerName(device)}
-          </Text>
-
-          <Text style={styles.listSubText}>
-            Son görülme: {formatDate(device.lastSeen)}
-          </Text>
-
-          <Text style={styles.tapHint}>Detay için dokun</Text>
-        </View>
-
+      return (
         <View
-          style={[
-            styles.statusBadge,
-            device.isActive
-              ? styles.activeDeviceBadge
-              : styles.passiveDeviceBadge,
-          ]}>
-          <Text style={styles.badgeText}>
-            {device.isActive ? 'Aktif' : 'Pasif'}
-          </Text>
+          key={device._id || device.id || device.deviceId || index}
+          style={styles.adminDeviceCard}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={styles.adminDeviceMainRow}
+            onPress={() => setSelectedDevice(device)}>
+            <View style={styles.listInfo}>
+              <Text style={styles.listTitle}>
+                {device.name || 'İsimsiz Cihaz'}
+              </Text>
+
+              <Text style={styles.listSubText}>
+                Cihaz ID: {device.deviceId || '-'}
+              </Text>
+
+              <Text style={styles.listSubText}>
+                Kullanıcı: {getDeviceOwnerName(device)}
+              </Text>
+
+              <Text style={styles.listSubText}>
+                Son görülme: {formatDate(device.lastSeen)}
+              </Text>
+
+              <Text style={styles.listSubText}>
+                Konum:{' '}
+                {deviceLocation
+                  ? getLocationText(deviceLocation)
+                  : 'Son sensör kaydından alınacak'}
+              </Text>
+
+              <Text style={styles.tapHint}>Detay için dokun</Text>
+            </View>
+
+            <View
+              style={[
+                styles.statusBadge,
+                device.isActive
+                  ? styles.activeDeviceBadge
+                  : styles.passiveDeviceBadge,
+              ]}>
+              <Text style={styles.badgeText}>
+                {device.isActive ? 'Aktif' : 'Pasif'}
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={styles.mapWideButton}
+            onPress={() => handleOpenDeviceLocation(device)}>
+            <Text style={styles.mapWideButtonTitle}>Cihaz Konumu</Text>
+
+            <Text style={styles.mapWideButtonText}>Haritada Aç ›</Text>
+          </TouchableOpacity>
         </View>
-      </TouchableOpacity>
-    ));
+      );
+    });
   };
 
   const renderUserDetailModal = () => {
@@ -974,7 +1132,6 @@ const AdminManagementScreen = ({navigation}: any) => {
       </Modal>
     );
   };
-
   const renderAlarmDetailModal = () => {
     if (!selectedAlarm) {
       return null;
@@ -982,10 +1139,7 @@ const AdminManagementScreen = ({navigation}: any) => {
 
     const alarmId = selectedAlarm._id || selectedAlarm.id;
 
-    const location =
-      selectedAlarm.location ||
-      selectedAlarm.sensorData?.location ||
-      selectedAlarm.sensorData;
+    const location = normalizeLocation(selectedAlarm);
 
     return (
       <Modal
@@ -1067,7 +1221,36 @@ const AdminManagementScreen = ({navigation}: any) => {
               <View style={styles.detailSection}>
                 <Text style={styles.detailSectionTitle}>Konum Bilgisi</Text>
 
-                <Text style={styles.detailText}>{formatJson(location)}</Text>
+                {location ? (
+                  <>
+                    <Text style={styles.detailText}>
+                      Enlem: {location.latitude.toFixed(6)}
+                    </Text>
+
+                    <Text style={styles.detailText}>
+                      Boylam: {location.longitude.toFixed(6)}
+                    </Text>
+
+                    <Text style={styles.detailText}>
+                      Doğruluk:{' '}
+                      {location.accuracy
+                        ? `±${Math.round(location.accuracy)}m`
+                        : 'Bilinmiyor'}
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={styles.detailText}>
+                    Bu alarm kaydında direkt konum yok. Cihazın son konumu
+                    haritadan kontrol edilebilir.
+                  </Text>
+                )}
+
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  style={styles.mapDetailButton}
+                  onPress={() => handleOpenAlarmLocation(selectedAlarm)}>
+                  <Text style={styles.mapDetailButtonText}>Haritada Aç</Text>
+                </TouchableOpacity>
               </View>
 
               <View style={styles.detailSection}>
@@ -1101,6 +1284,7 @@ const AdminManagementScreen = ({navigation}: any) => {
     const activeDeviceAlarms = selectedDeviceAlarms.filter(
       item => !item.resolved,
     );
+    const deviceLocation = normalizeLocation(selectedDevice);
 
     return (
       <Modal
@@ -1152,18 +1336,35 @@ const AdminManagementScreen = ({navigation}: any) => {
 
               <View style={styles.detailStatsRow}>
                 <View style={styles.detailSmallCard}>
-                  <Text style={styles.detailSmallLabel}>Alarm</Text>
+                  <Text style={styles.detailSmallLabel}>Toplam Alarm</Text>
                   <Text style={styles.detailSmallValue}>
                     {selectedDeviceAlarms.length}
                   </Text>
                 </View>
 
                 <View style={styles.detailSmallCard}>
-                  <Text style={styles.detailSmallLabel}>Aktif</Text>
+                  <Text style={styles.detailSmallLabel}>Aktif Alarm</Text>
                   <Text style={[styles.detailSmallValue, styles.dangerText]}>
                     {activeDeviceAlarms.length}
                   </Text>
                 </View>
+              </View>
+
+              <View style={styles.detailSection}>
+                <Text style={styles.detailSectionTitle}>Cihaz Konumu</Text>
+
+                <Text style={styles.detailText}>
+                  {deviceLocation
+                    ? getLocationText(deviceLocation)
+                    : 'Cihaz modelinde direkt konum yok. Son sensör kaydından haritada gösterilecek.'}
+                </Text>
+
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  style={styles.mapDetailButton}
+                  onPress={() => handleOpenDeviceLocation(selectedDevice)}>
+                  <Text style={styles.mapDetailButtonText}>Haritada Aç</Text>
+                </TouchableOpacity>
               </View>
 
               <View style={styles.detailSection}>
@@ -1940,6 +2141,83 @@ const styles = StyleSheet.create({
   },
 
   backButtonText: {
+    color: '#60A5FA',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+
+  alarmActionGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+
+  mapMiniButton: {
+    backgroundColor: '#172554',
+    borderWidth: 1,
+    borderColor: '#2563EB',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+
+  mapMiniButtonText: {
+    color: '#60A5FA',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+
+  adminDeviceCard: {
+    backgroundColor: '#1E293B',
+    borderRadius: 16,
+    padding: 15,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#263449',
+  },
+
+  adminDeviceMainRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+
+  mapWideButton: {
+    marginTop: 12,
+    backgroundColor: '#061B33',
+    borderWidth: 1,
+    borderColor: '#17314F',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  mapWideButtonTitle: {
+    color: '#CBD5E1',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+
+  mapWideButtonText: {
+    color: '#60A5FA',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+
+  mapDetailButton: {
+    backgroundColor: '#172554',
+    borderWidth: 1,
+    borderColor: '#2563EB',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+
+  mapDetailButtonText: {
     color: '#60A5FA',
     fontSize: 14,
     fontWeight: '900',

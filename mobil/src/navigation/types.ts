@@ -10,4 +10,13 @@ export type BottomTabParamList = {
   Alarmlar: undefined;
   Cihazlar: undefined;
   Profil: undefined;
+  YonetimPaneli: undefined;
+
+  Konum: {
+    deviceId?: string;
+    deviceName?: string;
+    deviceCode?: string;
+    initialLocation?: any;
+    token?: string;
+  };
 };

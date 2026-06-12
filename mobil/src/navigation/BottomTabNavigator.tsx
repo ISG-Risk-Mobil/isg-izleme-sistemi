@@ -10,6 +10,7 @@ import AlarmScreen from '../screens/alarms/AlarmScreen';
 import DevicesScreen from '../screens/devices/DevicesScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
 import AdminManagementScreen from '../screens/admin/AdminManagementScreen';
+import LocationScreen from '../screens/location/LocationScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -49,16 +50,14 @@ const BottomTabNavigator = () => {
           } else if (route.name === 'Profil') {
             iconName = focused ? 'person' : 'person-outline';
           } else if (route.name === 'YonetimPaneli') {
-            iconName = focused ? 'shield-checkmark' : 'shield-checkmark-outline';
+            iconName = focused
+              ? 'shield-checkmark'
+              : 'shield-checkmark-outline';
+          } else if (route.name === 'Konum') {
+            iconName = focused ? 'location' : 'location-outline';
           }
 
-          return (
-            <Ionicons
-              name={iconName}
-              size={22}
-              color={color}
-            />
-          );
+          return <Ionicons name={iconName} size={22} color={color} />;
         },
       })}>
       <Tab.Screen
@@ -104,6 +103,20 @@ const BottomTabNavigator = () => {
       <Tab.Screen
         name="YonetimPaneli"
         component={AdminManagementScreen}
+        options={{
+          tabBarButton: () => null,
+          tabBarItemStyle: {
+            display: 'none',
+          },
+          tabBarStyle: {
+            display: 'none',
+          },
+        }}
+      />
+
+      <Tab.Screen
+        name="Konum"
+        component={LocationScreen}
         options={{
           tabBarButton: () => null,
           tabBarItemStyle: {

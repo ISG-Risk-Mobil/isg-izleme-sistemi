@@ -398,15 +398,37 @@ const HomeScreen = ({navigation}: any) => {
     );
   };
 
+  const handleOpenLocationMap = () => {
+    const deviceMongoId = activeDevice?._id || activeDevice?.id;
+
+    const initialLocation = lastSensorPayload?.location || null;
+
+    if (!deviceMongoId && !initialLocation) {
+      Alert.alert(
+        'Konum bulunamadı',
+        'Haritada göstermek için önce cihazdan konum verisi gelmeli.',
+      );
+      return;
+    }
+
+    navigation.navigate('Konum', {
+      deviceId: deviceMongoId,
+      deviceName: activeDevice?.name || 'Aktif Cihaz',
+      deviceCode: activeDevice?.deviceId || activeDevice?._id || '-',
+      initialLocation,
+      token,
+    });
+  };
+
   const renderAdminPanel = () => {
     if (!isAdmin) return null;
 
     return (
-      <TouchableOpacity
-        activeOpacity={0.85}
-        style={styles.adminPanel}
-        onPress={() => navigation.navigate('YonetimPaneli')}>
-        <View style={styles.adminPanelHeader}>
+      <View style={styles.adminPanel}>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={styles.adminPanelHeader}
+          onPress={() => navigation.navigate('YonetimPaneli')}>
           <View style={styles.adminPanelHeaderText}>
             <Text style={styles.adminPanelTitle}>Yönetim Paneli</Text>
 
@@ -418,7 +440,7 @@ const HomeScreen = ({navigation}: any) => {
           <View style={styles.adminArrowBox}>
             <Text style={styles.adminPanelArrow}>›</Text>
           </View>
-        </View>
+        </TouchableOpacity>
 
         {adminLoading ? (
           <ActivityIndicator
@@ -448,7 +470,27 @@ const HomeScreen = ({navigation}: any) => {
             </View>
           </View>
         )}
-      </TouchableOpacity>
+
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={styles.adminMapButton}
+          onPress={handleOpenLocationMap}>
+          <View style={styles.adminMapIconBox}>
+            <Text style={styles.adminMapIcon}>⌖</Text>
+          </View>
+
+          <View style={styles.adminMapTextArea}>
+            <Text style={styles.adminMapTitle}>Konum Haritası</Text>
+            <Text style={styles.adminMapSubTitle}>
+              {activeDevice
+                ? `${activeDevice.name} konumunu görüntüle`
+                : 'Aktif cihaz konumu bekleniyor'}
+            </Text>
+          </View>
+
+          <Text style={styles.adminMapArrow}>›</Text>
+        </TouchableOpacity>
+      </View>
     );
   };
 
@@ -539,10 +581,17 @@ const HomeScreen = ({navigation}: any) => {
           </View>
         </View>
 
-        <View style={styles.locationCard}>
-          <Text style={styles.cardTitle}>Son Konum</Text>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={styles.locationCard}
+          onPress={handleOpenLocationMap}>
+          <View style={styles.locationCardHeader}>
+            <Text style={styles.cardTitle}>Son Konum</Text>
+            <Text style={styles.locationOpenText}>Haritada Aç ›</Text>
+          </View>
+
           <Text style={styles.locationText}>{liveData.location}</Text>
-        </View>
+        </TouchableOpacity>
 
         <View style={styles.alertHeader}>
           <Text style={styles.sectionTitle}>Son Alarm Kayıtları</Text>
@@ -1236,5 +1285,69 @@ const styles = StyleSheet.create({
 
   adminLoader: {
     marginVertical: 10,
+  },
+  adminMapButton: {
+    marginTop: 12,
+    backgroundColor: '#061B33',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#17314F',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+
+  adminMapIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#172554',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#2563EB',
+  },
+
+  adminMapIcon: {
+    color: '#60A5FA',
+    fontSize: 20,
+    fontWeight: '900',
+  },
+
+  adminMapTextArea: {
+    flex: 1,
+  },
+
+  adminMapTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+
+  adminMapSubTitle: {
+    color: '#94A3B8',
+    fontSize: 11,
+    marginTop: 3,
+  },
+
+  adminMapArrow: {
+    color: '#60A5FA',
+    fontSize: 24,
+    fontWeight: '900',
+  },
+
+  locationCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  locationOpenText: {
+    color: '#60A5FA',
+    fontSize: 12,
+    fontWeight: '800',
+    marginBottom: 12,
   },
 });
