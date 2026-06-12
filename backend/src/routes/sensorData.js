@@ -70,8 +70,6 @@ console.log('Detected alarms:', detectedAlarms);
       req.app.get('io').emit('new-alarm', alarm);
     }
 
-    //req.app.get('io').emit('sensor-update', log);
-    // herkese değil, sadece o kullanıcıya gönder
     req.app.get('io').to(`user_${req.user._id}`).emit('sensor-update', log);
 
     res.status(201).json({ 
@@ -84,26 +82,7 @@ console.log('Detected alarms:', detectedAlarms);
   }
 });
 
-router.get('/:deviceId', protect, async (req, res) => {
-  try {
-    const { limit = 50, from, to } = req.query;
-    let query = { deviceId: req.params.deviceId };
-    
-    if (from || to) {
-      query.timestamp = {};
-      if (from) query.timestamp.$gte = new Date(from);
-      if (to) query.timestamp.$lte = new Date(to);
-    }
 
-    const logs = await SensorLog.find(query)
-      .sort({ timestamp: -1 })
-      .limit(Number(limit));
-
-    res.json({ success: true, count: logs.length, logs });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
 
 router.post('/vision-violation', protect, async (req, res) => {
   try {
@@ -125,17 +104,13 @@ router.post('/vision-violation', protect, async (req, res) => {
   }
 });
 
-//GPS İÇİN EKLENDİ
-// Kullanıcının son konum bilgisini döndür (admin için)
 router.get('/user-location/:userId', protect, async (req, res) => {
   try {
-    // Kullanıcının cihazını bul
     const device = await Device.findOne({ assignedUser: req.params.userId });
     if (!device) {
       return res.status(404).json({ success: false, message: 'Cihaz bulunamadı' });
     }
 
-    // O cihazın location içeren en son log'unu çek
     const sonLog = await SensorLog.findOne({
       deviceId: device._id,
       'location': { $exists: true, $ne: null }
@@ -156,7 +131,6 @@ router.get('/user-location/:userId', protect, async (req, res) => {
   }
 });
 
-// Giriş yapan kullanıcının kendi son konum bilgisi
 router.get('/my-location', protect, async (req, res) => {
   try {
     const device = await Device.findOne({ assignedUser: req.user._id });
@@ -179,6 +153,27 @@ router.get('/my-location', protect, async (req, res) => {
       location: sonLog.location,
       lastSeen: sonLog.timestamp
     });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+router.get('/:deviceId', protect, async (req, res) => {
+  try {
+    const { limit = 50, from, to } = req.query;
+    let query = { deviceId: req.params.deviceId };
+    
+    if (from || to) {
+      query.timestamp = {};
+      if (from) query.timestamp.$gte = new Date(from);
+      if (to) query.timestamp.$lte = new Date(to);
+    }
+
+    const logs = await SensorLog.find(query)
+      .sort({ timestamp: -1 })
+      .limit(Number(limit));
+
+    res.json({ success: true, count: logs.length, logs });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

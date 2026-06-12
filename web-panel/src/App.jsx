@@ -20,28 +20,22 @@ function App() {
   const [isAuthOpen, setIsAuthOpen] = useState(false); 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentIdx, setCurrentIdx] = useState(0);
-  const [loginEmail, setLoginEmail] = useState('');       // YENİ
-  const [loginPassword, setLoginPassword] = useState(''); // YENİ
+  const [loginEmail, setLoginEmail] = useState('');       
+  const [loginPassword, setLoginPassword] = useState(''); 
 
-  // App.jsx - handleLogin fonksiyonu:
-// App.jsx içerisinde
-const handleLogin = (userData) => {
-  // Gelen veriyi güvenli bir şekilde sakla
+ const handleLogin = (userData) => {
+  
   localStorage.setItem('token', userData.token);
   localStorage.setItem('role', userData.role);
   localStorage.setItem('userName', userData.name);
   
-  // State'i güncelle: Bu satır, App.jsx'in Dashboard'u render etmesini sağlar
-  setIsLoggedIn(true); 
   
-  // Eğer özel bir modal yapın varsa onu kapat
+  setIsLoggedIn(true); 
   setIsAuthOpen(false); 
 };
 
-// ... render içinde:
 <Login onLogin={handleLogin} />
 
-  // YENİ: Direkt login fonksiyonu
   const handleDirectLogin = async () => {
     try {
       const res = await axios.post('http://localhost:5000/api/auth/login', {
@@ -98,7 +92,7 @@ const handleLogin = (userData) => {
                 Zekayı Saha ile Birleştirin.
               </h1>
               <p style={{ ...subHeading, fontSize: '18px', lineHeight: '1.7', maxWidth: '450px', color: '#E2E8F0', opacity: 0.9 }}>
-                Yapay zeka destekli proaktif analiz yöntemlerimizle, tesisinizdeki riskleri önceden tahmin edin; iş kazalarını gerçekleşmeden önleyin.
+                Canlı veri takibi ve dinamik risk analiz yöntemlerimizle tesis güvenliğini üst seviyeye çıkarın.
               </p>
             </div>
             
@@ -109,7 +103,7 @@ const handleLogin = (userData) => {
 
           <section style={rightPanel}>
             {!isAuthOpen ? (
-              // DEĞİŞTİ: Butonlar yerine direkt form
+              
               <div style={entryArea}>
                 <h2 style={{fontSize: '28px', fontWeight: '700', marginBottom: '10px', color: '#FFF'}}>Sistemi Başlatın</h2>
                 <input
@@ -169,7 +163,6 @@ const authContainer = { width: '100%', display: 'flex', flexDirection: 'column',
 const primaryBtn = { padding: '18px 40px', fontSize: '16px', fontWeight: '600', backgroundColor: RENKLER.accent, border: 'none', borderRadius: '8px', cursor: 'pointer', color: '#000' };
 const secondaryBtn = { padding: '18px 40px', fontSize: '16px', fontWeight: '600', backgroundColor: 'transparent', border: '1px solid #334155', color: '#FFF', borderRadius: '8px', cursor: 'pointer' };
 const backBtn = { marginBottom: '20px', background: 'none', border: 'none', color: RENKLER.textMuted, cursor: 'pointer' };
-// YENİ stil
 const inputStyle = { width: '100%', padding: '14px', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid #1e293b', borderRadius: '8px', color: '#FFF', boxSizing: 'border-box', outline: 'none' };
 
 export default App;

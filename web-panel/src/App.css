@@ -63,8 +63,8 @@
   place-content: center;
   place-items: center;
   flex-grow: 1;
-  min-height: fit-content; /* İçeriğin boyutu kadar yer kapla */
-  padding-bottom: 50px;    /* Alt tarafta biraz boşluk bırakır */
+  min-height: fit-content; 
+  padding-bottom: 50px;    
 
   @media (max-width: 1024px) {
     padding: 32px 20px 24px;

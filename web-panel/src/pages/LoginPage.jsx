@@ -20,7 +20,6 @@ function LoginPage({ baslangicKayitMi, baslangicSifreUnuttumMu, onLogin }) {
   const [password, setPassword] = useState('');
   const [department, setDepartment] = useState('');
 
-  // Şifremi unuttum adımları: null | 'email' | 'reset'
   const [sifreAdim, setSifreAdim] = useState(baslangicSifreUnuttumMu ? 'email' : null);
   const [resetEmail, setResetEmail] = useState('');
   const [resetToken, setResetToken] = useState('');
@@ -49,7 +48,6 @@ function LoginPage({ baslangicKayitMi, baslangicSifreUnuttumMu, onLogin }) {
     }
   };
 
-  // Adım 1: Email gönder, resetToken al
   const sifreResetEmailGonder = async () => {
     if (!resetEmail) { setMesaj({ tip: 'hata', metin: 'Email adresinizi girin.' }); return; }
     setYukleniyor(true);
@@ -66,7 +64,6 @@ function LoginPage({ baslangicKayitMi, baslangicSifreUnuttumMu, onLogin }) {
     }
   };
 
-  // Adım 2: Yeni şifreyi kaydet
   const sifreSifirla = async () => {
     if (!yeniSifre || !yeniSifreTekrar) { setMesaj({ tip: 'hata', metin: 'Tüm alanları doldurun.' }); return; }
     if (yeniSifre !== yeniSifreTekrar) { setMesaj({ tip: 'hata', metin: 'Şifreler eşleşmiyor.' }); return; }
@@ -94,7 +91,6 @@ function LoginPage({ baslangicKayitMi, baslangicSifreUnuttumMu, onLogin }) {
     }
   };
 
-  // ──── ŞİFREMİ UNUTTUM EKRANI ────
   if (sifreAdim === 'email') {
     return (
       <div style={pageContainer}>
@@ -165,7 +161,6 @@ function LoginPage({ baslangicKayitMi, baslangicSifreUnuttumMu, onLogin }) {
     );
   }
 
-  // ──── NORMAL GİRİŞ / KAYIT EKRANI ────
   return (
     <div style={pageContainer}>
       <div style={glassCardStyle}>
@@ -202,7 +197,7 @@ function LoginPage({ baslangicKayitMi, baslangicSifreUnuttumMu, onLogin }) {
             </button>
           </div>
 
-          {/* Şifremi Unuttum linki — sadece login modunda */}
+          
           {isLogin && (
             <button type="button" onClick={() => setSifreAdim('email')} style={{ ...toggleButton, textAlign: 'right', marginTop: '-10px', marginBottom: '10px', color: RENKLER.accent }}>
               Şifremi Unuttum
