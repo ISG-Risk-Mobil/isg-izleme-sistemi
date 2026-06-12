@@ -9,6 +9,7 @@ import DashboardScreen from '../screens/dashboard/DashboardScreen';
 import AlarmScreen from '../screens/alarms/AlarmScreen';
 import DevicesScreen from '../screens/devices/DevicesScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
+import AdminManagementScreen from '../screens/admin/AdminManagementScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -34,7 +35,7 @@ const BottomTabNavigator = () => {
           fontWeight: '600',
         },
 
-        tabBarIcon: ({color, size, focused}) => {
+        tabBarIcon: ({color, focused}) => {
           let iconName: string = 'home';
 
           if (route.name === 'AnaSayfa') {
@@ -47,9 +48,17 @@ const BottomTabNavigator = () => {
             iconName = focused ? 'phone-portrait' : 'phone-portrait-outline';
           } else if (route.name === 'Profil') {
             iconName = focused ? 'person' : 'person-outline';
+          } else if (route.name === 'YonetimPaneli') {
+            iconName = focused ? 'shield-checkmark' : 'shield-checkmark-outline';
           }
 
-          return <Ionicons name={iconName} size={22} color={color} />;
+          return (
+            <Ionicons
+              name={iconName}
+              size={22}
+              color={color}
+            />
+          );
         },
       })}>
       <Tab.Screen
@@ -89,6 +98,20 @@ const BottomTabNavigator = () => {
         component={ProfileScreen}
         options={{
           tabBarLabel: 'Profil',
+        }}
+      />
+
+      <Tab.Screen
+        name="YonetimPaneli"
+        component={AdminManagementScreen}
+        options={{
+          tabBarButton: () => null,
+          tabBarItemStyle: {
+            display: 'none',
+          },
+          tabBarStyle: {
+            display: 'none',
+          },
         }}
       />
     </Tab.Navigator>

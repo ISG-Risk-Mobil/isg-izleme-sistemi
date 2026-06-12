@@ -393,21 +393,20 @@ const HomeScreen = ({navigation}: any) => {
     if (!isAdmin) return null;
 
     return (
-      <View style={styles.adminPanel}>
+      <TouchableOpacity
+        activeOpacity={0.85}
+        style={styles.adminPanel}
+        onPress={() => navigation.navigate('YonetimPaneli')}>
         <View style={styles.adminPanelHeader}>
           <View>
             <Text style={styles.adminPanelTitle}>Yönetim Paneli</Text>
 
             <Text style={styles.adminPanelSubTitle}>
-              Admin hesabı — kullanıcı yönetimi
+              Tüm sistem detayları için dokun
             </Text>
           </View>
 
-          <TouchableOpacity
-            style={styles.refreshButton}
-            onPress={fetchAdminPanelData}>
-            <Text style={styles.refreshButtonText}>Yenile</Text>
-          </TouchableOpacity>
+          <Text style={styles.adminPanelArrow}>›</Text>
         </View>
 
         {adminLoading ? (
@@ -424,118 +423,13 @@ const HomeScreen = ({navigation}: any) => {
               {renderAdminStatCard('Admin', adminCount)}
             </View>
 
-            <View style={styles.adminUsersHeader}>
-              <Text style={styles.adminSectionTitle}>Kullanıcılar</Text>
-
-              <Text style={styles.adminUserCountText}>
-                {adminUsers.length} kişi
-              </Text>
-            </View>
-
-            {adminUsers.length === 0 ? (
-              <Text style={styles.adminEmptyText}>Kullanıcı bulunamadı.</Text>
-            ) : (
-              visibleAdminUsers.map((item, index) => {
-                const itemId = getUserId(item);
-                const currentUserId = getCurrentUserId();
-                const itemRole = item.role === 'admin' ? 'admin' : 'worker';
-                const nextRole = itemRole === 'worker' ? 'admin' : 'worker';
-                const isCurrentUser = itemId === currentUserId;
-                const isChanging = roleChangingUserId === itemId;
-
-                return (
-                  <View key={itemId || index} style={styles.adminListCard}>
-                    <View style={styles.adminListLeft}>
-                      <View
-                        style={[
-                          styles.avatarCircle,
-                          itemRole === 'admin' && styles.adminAvatarCircle,
-                        ]}>
-                        <Text
-                          style={[
-                            styles.avatarText,
-                            itemRole === 'admin' && styles.adminAvatarText,
-                          ]}>
-                          {(item.name || '?').charAt(0).toUpperCase()}
-                        </Text>
-                      </View>
-
-                      <View style={styles.adminListInfo}>
-                        <Text style={styles.adminListTitle}>
-                          {item.name || 'İsimsiz Kullanıcı'}
-                        </Text>
-
-                        <Text style={styles.adminListSubText}>
-                          {item.email || 'E-posta yok'}
-                        </Text>
-
-                        <Text style={styles.adminListSubText}>
-                          Departman: {item.department || 'Genel'}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.adminListRight}>
-                      <View
-                        style={[
-                          styles.roleBadge,
-                          itemRole === 'admin'
-                            ? styles.adminRoleBadge
-                            : styles.workerRoleBadge,
-                        ]}>
-                        <Text style={styles.roleBadgeText}>{itemRole}</Text>
-                      </View>
-
-                      {!isCurrentUser && (
-                        <TouchableOpacity
-                          style={[
-                            styles.roleActionButton,
-                            nextRole === 'admin'
-                              ? styles.makeAdminButton
-                              : styles.makeWorkerButton,
-                            isChanging && styles.roleActionButtonDisabled,
-                          ]}
-                          disabled={isChanging}
-                          onPress={() => handleChangeUserRole(item)}>
-                          <Text
-                            style={[
-                              styles.roleActionButtonText,
-                              nextRole === 'admin'
-                                ? styles.makeAdminButtonText
-                                : styles.makeWorkerButtonText,
-                            ]}>
-                            {isChanging
-                              ? '...'
-                              : nextRole === 'admin'
-                              ? 'Admin Yap'
-                              : 'Worker Yap'}
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-
-                      {isCurrentUser && (
-                        <Text style={styles.currentUserText}>Sen</Text>
-                      )}
-                    </View>
-                  </View>
-                );
-              })
-            )}
-
-            {adminUsers.length > 2 && (
-              <TouchableOpacity
-                style={styles.adminViewAllButton}
-                onPress={() => setShowAllUsers(previous => !previous)}>
-                <Text style={styles.adminViewAllText}>
-                  {showAllUsers
-                    ? 'Daha az göster'
-                    : `Tüm kullanıcıları göster (${adminUsers.length})`}
-                </Text>
-              </TouchableOpacity>
-            )}
+            <Text style={styles.adminHintText}>
+              Detaylı ekranda tüm kullanıcılar, tüm alarmlar ve cihazlar
+              görünür.
+            </Text>
           </>
         )}
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -1241,5 +1135,18 @@ const styles = StyleSheet.create({
     color: '#CBD5E1',
     fontWeight: '800',
     fontSize: 13,
+  },
+
+  adminPanelArrow: {
+    color: '#F59E0B',
+    fontSize: 36,
+    fontWeight: '900',
+  },
+
+  adminHintText: {
+    color: '#94A3B8',
+    fontSize: 13,
+    lineHeight: 20,
+    marginTop: 4,
   },
 });
