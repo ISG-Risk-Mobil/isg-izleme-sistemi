@@ -68,7 +68,7 @@ Mobil uygulama, çalışanın cihazından **ivmeölçer**, **jiroskop**, **GPS k
 
 | Giriş Ekranı | Canlı Dashboard | Admin Paneli |
 |---|---|---|
-| <img src="docs/screenshots/web-login.svg" alt="Web giriş ekranı" width="290" /> | <img src="docs/screenshots/web-dashboard.svg" alt="Web dashboard ekranı" width="290" /> | <img src="docs/screenshots/admin-panel.svg" alt="Admin paneli" width="290" /> |
+| <img src="docs/screenshots/web-login.jfif" alt="Web giriş ekranı" width="290" /> | <img src="docs/screenshots/web-dashboard.jfif" alt="Web dashboard ekranı" width="290" /> | <img src="docs/screenshots/admin-panel.jfif" alt="Admin paneli" width="290" /> |
 
 ### Mobil Uygulama
 
