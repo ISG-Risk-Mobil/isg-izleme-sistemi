@@ -41,8 +41,14 @@ io.on('connection', (socket) => {
   });
 });
 
-mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 10000, family: 4 })
-  .then(() => {
+const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI;
+
+if (!mongoUri) {
+  console.error('MongoDB URI bulunamadı. .env dosyasında MONGODB_URI veya MONGO_URI olmalı.');
+  process.exit(1);
+}
+
+mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 10000, family: 4 })  .then(() => {
     console.log('MongoDB bağlandı');
     server.listen(process.env.PORT, () => {
       console.log(`Sunucu ${process.env.PORT} portunda çalışıyor`);
